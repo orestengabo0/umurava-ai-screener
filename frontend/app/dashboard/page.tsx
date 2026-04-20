@@ -14,6 +14,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 
 const recentActivity = [
     { id: 1, text: "New applicant for Senior React Developer", time: "2 min ago", type: "applicant" },
@@ -31,6 +32,7 @@ const dotColor: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+    const router = useRouter();
     return (
         <AppLayout>
             <div className="page-container space-y-8 p-6">
@@ -43,12 +45,12 @@ export default function DashboardPage() {
                         </p>
                     </div>
 
-                    <Link href="/jobs/create">
-                        <Button size="lg" className="gap-2 rounded-xl">
-                            <Plus className="w-4 h-4" />
-                            Create New Job
-                        </Button>
-                    </Link>
+                    <Button size={"lg"} onClick={() => {
+                        router.push("/jobs/create");
+                    }}>
+                        <Plus className="w-4 h-4" />
+                        Create New Job
+                    </Button>
                 </div>
 
                 {/* Stats */}
