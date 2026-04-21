@@ -1,7 +1,9 @@
 // lib/api/jobs.ts
 // Typed API client for the Job endpoints
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+// Strip trailing /api if present — the functions below already append /api/...
+const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const BASE = _RAW_BASE.endsWith("/api") ? _RAW_BASE.slice(0, -4) : _RAW_BASE;
 
 export type ExperienceLevel = "entry" | "mid" | "senior" | "lead" | "executive";
 export type JobStatus = "open" | "closed";
