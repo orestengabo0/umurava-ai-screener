@@ -201,8 +201,21 @@ export async function ingestResumesProcess(
             };
           }
 
-          return await persistLimit(async () => {
-            const parsedApplicant = validated.data;
+          const parsedApplicant = validated.data;
+ 
+           if (!parsedApplicant.isResume) {
+             return {
+               ok: false as const,
+               stage: "validate" as const,
+               originalName: file.originalname,
+               size: file.size,
+               mimeType: file.mimetype,
+               textLength,
+               reason: "File skipped: This does not appear to be a resume.",
+             };
+           }
+ 
+           return await persistLimit(async () => {
 
             const applicantDoc = await Applicant.findOneAndUpdate(
               { jobId, email: parsedApplicant.email },
@@ -290,6 +303,11 @@ export async function ingestResumesProcess(
                   uploadedAt: new Date(),
                   fileType: "pdf",
                   fileName: file.originalname,
+                  matchScore: parsedApplicant.matchScore,
+                  recommendation: parsedApplicant.recommendation,
+                  strengths: parsedApplicant.strengths,
+                  gaps: parsedApplicant.gaps,
+                  aiSummary: parsedApplicant.aiSummary,
                 },
               },
               {
@@ -315,6 +333,7 @@ export async function ingestResumesProcess(
               originalName: file.originalname,
               mimeType: file.mimetype,
               size: file.size,
+              extractedText: resumeText,
             });
 
             return {

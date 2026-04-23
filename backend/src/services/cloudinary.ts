@@ -37,7 +37,9 @@ export async function uploadPdfBuffer(params: {
   return await new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
-        resource_type: "raw",
+        resource_type: "image",
+        type: "upload",
+        format: "pdf",
         folder,
         filename_override: filename,
         use_filename: true,
@@ -64,7 +66,7 @@ export async function deleteRawAsset(publicId: string): Promise<void> {
   configureCloudinary();
 
   await cloudinary.uploader.destroy(publicId, {
-    resource_type: "raw",
+    resource_type: "image",
     invalidate: true,
   });
 }

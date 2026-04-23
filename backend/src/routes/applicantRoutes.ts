@@ -5,6 +5,8 @@ import {
   getApplicants,
   getApplicantById,
   deleteApplicant,
+  chatWithApplicant,
+  deleteJobApplicants,
 } from "../controllers/applicantController.ts";
 
 const router = Router();
@@ -42,5 +44,7 @@ router.post("/upload", upload.single("file"), uploadApplicants);
 router.get("/", getApplicants);
 router.get("/:id", getApplicantById);
 router.delete("/:id", deleteApplicant);
+router.post("/:id/chat", chatWithApplicant);
+router.delete("/job/:jobId", deleteJobApplicants);
 
 export default router;

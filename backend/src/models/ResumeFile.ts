@@ -11,6 +11,7 @@ export interface ResumeFile {
   originalName: string;
   mimeType: string;
   size: number;
+  extractedText?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +54,7 @@ const ResumeFileSchema = new Schema<ResumeFile>(
       type: Number,
       required: true,
     },
+    extractedText: String,
   },
   {
     timestamps: true,

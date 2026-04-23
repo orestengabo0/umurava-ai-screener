@@ -39,4 +39,30 @@ router.post(
   ingestResumesProcess
 );
 
+router.post("/jobs/:jobId/chat-results", async (req: any, res: any) => {
+  try {
+    const { jobId } = req.params;
+    const { message, context } = req.body;
+    const { getGeminiClient } = await import("../services/gemini.ts");
+    const { JobModel } = await import("../models/Job.ts");
+
+    const job = await JobModel.findById(jobId).lean();
+    
+    const model = getGeminiClient().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const prompt = `You are a recruiter analyzing candidates for the following job:
+    JOB TITLE: ${job?.title}
+    JOB DESCRIPTION: ${job?.description}
+    JOB REQUIREMENTS: ${job?.requirements?.join(", ")}
+    
+    CANDIDATES DATA: ${JSON.stringify(context)}
+    
+    User Question: ${message}`;
+    
+    const result = await model.generateContent(prompt);
+    res.status(200).json({ response: result.response.text() });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;

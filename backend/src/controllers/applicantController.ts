@@ -88,15 +88,20 @@ export const getApplicantById = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Applicant id is required" });
     }
 
-    const applicant = await Applicant.findById(id);
+    const applicant = await Applicant.findById(id).lean();
 
     if (!applicant) {
       return res.status(404).json({ message: "Applicant not found" });
     }
 
+    const resumeFile = await ResumeFileModel.findOne({ applicantId: id }).lean();
+
     res.status(200).json({
       message: "Applicant retrieved successfully",
-      data: applicant,
+      data: {
+        ...applicant,
+        resumeFile,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Fetch failed";
@@ -137,6 +142,92 @@ export const deleteApplicant = async (req: Request, res: Response) => {
     res.status(200).json({
       message: "Applicant deleted successfully",
       data: applicant,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete failed";
+    res.status(500).json({ message });
+  }
+};
+export const chatWithApplicant = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { message, history } = req.body;
+
+    if (!id || !message) {
+      return res.status(400).json({ message: "Applicant ID and message are required" });
+    }
+
+    const applicant = await Applicant.findById(id).lean();
+    if (!applicant) {
+      return res.status(404).json({ message: "Applicant not found" });
+    }
+
+    const resumeFile = await ResumeFileModel.findOne({ applicantId: id }).lean();
+    const resumeText = resumeFile?.extractedText || "";
+
+    const { JobModel } = await import("../models/Job.ts");
+    const job = await JobModel.findById(applicant.jobId).lean();
+
+    const context = `
+      You are an AI assistant helping a recruiter analyze a candidate for a job.
+      
+      JOB CONTEXT:
+      Title: ${job?.title}
+      Description: ${job?.description}
+      Requirements: ${job?.requirements?.join(", ")}
+
+      CANDIDATE INFO:
+      ${JSON.stringify(applicant)}
+      
+      FULL RESUME TEXT:
+      ${resumeText}
+      
+      User Message: ${message}
+      
+      RULES:
+      - Be professional and objective.
+      - Base your answers on the candidate's data, resume text, and how they fit the specific job.
+      - If you don't know, say so.
+    `;
+
+    const model = (await import("../services/gemini.ts")).getGeminiClient().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const result = await model.generateContent(context);
+    const response = result.response.text();
+
+    res.status(200).json({ response });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Chat failed";
+    res.status(500).json({ message });
+  }
+};
+
+export const deleteJobApplicants = async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+
+    if (!jobId) {
+      return res.status(400).json({ message: "Job ID is required" });
+    }
+
+    const applicants = await Applicant.find({ jobId }).lean();
+    const applicantIds = applicants.map(a => a._id);
+
+    const resumeFiles = await ResumeFileModel.find({
+      applicantId: { $in: applicantIds },
+    }).lean();
+
+    // Delete from Cloudinary
+    await Promise.allSettled(
+      resumeFiles.map((rf) => deleteRawAsset(rf.cloudinaryPublicId))
+    );
+
+    // Delete from DB
+    await ResumeFileModel.deleteMany({ applicantId: { $in: applicantIds } });
+    await Applicant.deleteMany({ jobId });
+
+    res.status(200).json({
+      message: "All applicants for the job deleted successfully",
+      count: applicants.length,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Delete failed";

@@ -63,11 +63,16 @@ interface IApplicant extends Document {
   uploadedAt: Date;
   fileType: "pdf" | "csv" | "xlsx";
   fileName: string;
+  matchScore?: number;
+  recommendation?: "Highly Recommended" | "Recommended" | "Consider" | "Not Recommended";
+  strengths?: string[];
+  gaps?: string[];
+  aiSummary?: string;
 }
 
 const applicantSchema = new Schema<IApplicant>({
-  firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  firstName: { type: String, default: "Unknown" },
+  lastName: { type: String, default: "Applicant" },
   email: { type: String, required: true },
   headline: String,
   bio: String,
@@ -75,10 +80,10 @@ const applicantSchema = new Schema<IApplicant>({
   phone: String,
   skills: [
     {
-      name: { type: String, required: true },
+      name: { type: String, default: "Unknown" },
       level: {
         type: String,
-        enum: ["Beginner", "Intermediate", "Advanced", "Expert"],
+        enum: ["Beginner", "Intermediate", "Advanced", "Expert", null],
         default: "Intermediate",
       },
       yearsOfExperience: Number,
@@ -89,16 +94,16 @@ const applicantSchema = new Schema<IApplicant>({
       name: String,
       proficiency: {
         type: String,
-        enum: ["Basic", "Conversational", "Fluent", "Native"],
+        enum: ["Basic", "Conversational", "Fluent", "Native", null],
       },
     },
   ],
   experience: [
     {
-      company: { type: String, required: true },
-      role: { type: String, required: true },
-      startDate: { type: String, required: true },
-      endDate: { type: String, required: true },
+      company: { type: String, default: "Unknown" },
+      role: { type: String, default: "Unknown" },
+      startDate: { type: String, default: "" },
+      endDate: { type: String, default: "" },
       description: String,
       technologies: [String],
       isCurrent: Boolean,
@@ -106,11 +111,11 @@ const applicantSchema = new Schema<IApplicant>({
   ],
   education: [
     {
-      institution: { type: String, required: true },
-      degree: { type: String, required: true },
-      fieldOfStudy: { type: String, required: true },
-      startYear: { type: Number, required: true },
-      endYear: { type: Number, required: true },
+      institution: { type: String, default: "Unknown" },
+      degree: { type: String, default: "Unknown" },
+      fieldOfStudy: String,
+      startYear: Number,
+      endYear: Number,
     },
   ],
   certifications: [
@@ -122,7 +127,7 @@ const applicantSchema = new Schema<IApplicant>({
   ],
   projects: [
     {
-      name: { type: String, required: true },
+      name: { type: String },
       description: String,
       technologies: [String],
       role: String,
@@ -135,12 +140,11 @@ const applicantSchema = new Schema<IApplicant>({
     status: {
       type: String,
       enum: ["Available", "Open to Opportunities", "Not Available"],
-      required: true,
     },
     type: {
       type: String,
       enum: ["Full-time", "Part-time", "Contract"],
-      required: true,
+      default: "Full-time",
     },
     startDate: String,
   },
@@ -159,6 +163,15 @@ const applicantSchema = new Schema<IApplicant>({
     required: true,
   },
   fileName: { type: String, required: true },
+  matchScore: { type: Number, default: 0 },
+  recommendation: {
+    type: String,
+    enum: ["Highly Recommended", "Recommended", "Consider", "Not Recommended"],
+    default: "Consider",
+  },
+  strengths: [String],
+  gaps: [String],
+  aiSummary: String,
 });
 
 applicantSchema.index(

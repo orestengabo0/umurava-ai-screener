@@ -46,15 +46,42 @@ export async function getJobs(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { status } = req.query as { status?: string };
+    const { status, search, page = "1", limit = "10" } = req.query as { 
+      status?: string; 
+      search?: string;
+      page?: string;
+      limit?: string;
+    };
 
-    const filter: Record<string, unknown> = {};
+    const p = parseInt(page);
+    const l = parseInt(limit);
+    const skip = (p - 1) * l;
+
+    const filter: Record<string, any> = {};
     if (status === "open" || status === "closed") {
       filter["status"] = status;
     }
+    if (search) {
+      filter["$or"] = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } }
+      ];
+    }
 
-    const jobs = await JobModel.find(filter).sort({ createdAt: -1 }).lean();
-    res.json(jobs);
+    const total = await JobModel.countDocuments(filter);
+    const jobs = await JobModel.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(l)
+      .lean();
+
+    res.json({
+      jobs,
+      total,
+      page: p,
+      limit: l,
+      totalPages: Math.ceil(total / l)
+    });
   } catch (err) {
     next(err);
   }
