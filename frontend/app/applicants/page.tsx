@@ -3,23 +3,24 @@
 import {
   Upload,
   FileText,
-  Table,
   X,
   Brain,
-  AlertCircle,
-  CheckCircle2,
   Info,
   FileSpreadsheet,
   Loader2,
+  Target,
+  FileSearch,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { extractFileText } from "@/lib/file-parsers";
 import { AppLayout } from "@/components/AppLayout";
 import { getJobs, type Job } from "@/lib/api/jobs";
+import { Badge } from "@/components/ui/badge";
 
 interface UploadedFile {
   id: number;
@@ -46,8 +47,10 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export default function Applicants() {
+function ApplicantsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialJobId = searchParams.get("jobId");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -90,7 +93,6 @@ export default function Applicants() {
       };
       setFiles((prev) => [...prev, entry]);
 
-      // Extract text and validate
       extractFileText(file, type)
         .then((text) => {
           if (!text || text.trim().length < 10) {
@@ -102,14 +104,13 @@ export default function Applicants() {
                       status: "error" as const,
                       errorMsg:
                         type === "pdf"
-                          ? "Could not extract text from this PDF (may be scanned image)"
-                          : "File appears empty or missing required columns",
+                          ? "Scanned PDF detected. Text extraction failed."
+                          : "File appears empty.",
                     }
                   : f
               )
             );
           } else {
-            // For XLSX/CSV: our extractor emits exactly one line per candidate (no header line)
             const candidateCount = text.split("\n").filter((l) => l.trim()).length;
             setFiles((prev) =>
               prev.map((f) =>
@@ -128,13 +129,7 @@ export default function Applicants() {
         .catch(() => {
           setFiles((prev) =>
             prev.map((f) =>
-              f.id === id
-                ? {
-                    ...f,
-                    status: "error" as const,
-                    errorMsg: "Failed to read file. Please try again.",
-                  }
-                : f
+              f.id === id ? { ...f, status: "error", errorMsg: "Read failure." } : f
             )
           );
         });
@@ -147,400 +142,200 @@ export default function Applicants() {
     processFiles(e.dataTransfer.files);
   };
 
-  const handleBrowse = () => fileInputRef.current?.click();
-  const removeFile = (id: number) => setFiles((prev) => prev.filter((f) => f.id !== id));
-
-  const validFiles = files.filter((f) => f.status === "valid");
-  const screenableFiles = files.filter(
-    (f) => f.status === "valid" || f.status === "processed"
-  );
-
-  const validCount = validFiles.length;
-  const hasErrors = files.some((f) => f.status === "error");
-  const isValidating = files.some((f) => f.status === "validating");
-  const isProcessing = files.some((f) => f.status === "processing");
-
   useEffect(() => {
     setJobsLoading(true);
-    getJobs("open")
-      .then((data) => {
-        setJobs(data);
-        if (!selectedJobId && data.length > 0) setSelectedJobId(data[0]._id);
-      })
-      .catch(() => {
-        // ignore here; user can still paste/select later
+    getJobs({ status: "open" })
+      .then((res) => {
+        setJobs(res.jobs);
+        if (initialJobId) {
+          setSelectedJobId(initialJobId);
+        } else if (!selectedJobId && res.jobs.length > 0) {
+          setSelectedJobId(res.jobs[0]._id);
+        }
       })
       .finally(() => setJobsLoading(false));
-  }, [selectedJobId]);
-
-  const fileIcon = (type: string) => {
-    if (type === "pdf") return <FileText className="w-5 h-5 text-destructive" />;
-    if (type === "xlsx") return <FileSpreadsheet className="w-5 h-5 text-success" />;
-    return <Table className="w-5 h-5 text-primary" />;
-  };
+  }, [initialJobId]);
 
   const handleRunScreening = async () => {
-    if (screenableFiles.length === 0) return;
+    if (!selectedJobId) return;
     setIsScreening(true);
-
-    try {
-      // Combine all extracted text from valid files
-      const sections: string[] = [];
-
-      for (const f of screenableFiles) {
-        setScreeningProgress("Reading " + f.name + "...");
-        const label =
-          f.type === "pdf"
-            ? "=== RESUME: " + f.name + " ===\n"
-            : "=== SPREADSHEET: " + f.name + " ===\n";
-        sections.push(label + (f.extractedText || ""));
-      }
-
-      const combinedText = sections.join("\n\n");
-
-      // Store in sessionStorage for results page
-      sessionStorage.setItem("applicants_text", combinedText);
-      sessionStorage.setItem("applicants_count", validFiles.length.toString());
-      sessionStorage.setItem(
-        "file_names",
-        validFiles.map((f) => f.name).join(", ")
-      );
-
-      setScreeningProgress("Starting AI analysis...");
-      router.push("/results");
-    } catch {
-      toast.error("Failed to prepare files for screening.");
-      setIsScreening(false);
-      setScreeningProgress("");
-    }
+    router.push(`/jobs/${selectedJobId}/results`);
   };
 
   const handleProcessToJob = async () => {
-    if (validCount === 0) return;
-
-    if (!selectedJobId) {
-      toast.error("Select a job first.");
-      return;
-    }
+    const validFiles = files.filter(f => f.status === "valid");
+    if (validFiles.length === 0 || !selectedJobId) return;
 
     setFiles((prev) =>
       prev.map((f) => (f.status === "valid" ? { ...f, status: "processing" } : f))
     );
 
-    setScreeningProgress("Uploading & processing...");
+    const baseRaw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+    const base = baseRaw.endsWith("/api") ? baseRaw.slice(0, -4) : baseRaw;
 
-    try {
-      const baseRaw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
-      const base = baseRaw.endsWith("/api") ? baseRaw.slice(0, -4) : baseRaw;
-
-      const form = new FormData();
-      for (const f of validFiles) {
-        // backend expects field name: files
+    for (const f of validFiles) {
+      setScreeningProgress(`Analyzing ${f.name}...`);
+      try {
+        const form = new FormData();
         form.append("files", f.rawFile, f.rawFile.name);
+        const res = await fetch(`${base}/api/jobs/${selectedJobId}/resumes/process`, {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json();
+        
+        setFiles((prev) =>
+          prev.map((file) => {
+            if (file.id !== f.id) return file;
+            if (data?.results?.[0]?.ok) return { ...file, status: "processed" as const };
+            return { ...file, status: "error" as const, errorMsg: data?.results?.[0]?.reason || "Failed" };
+          })
+        );
+      } catch (e) {
+        setFiles((prev) =>
+          prev.map((file) => (file.id === f.id ? { ...file, status: "error", errorMsg: "Upload failed" } : file))
+        );
       }
-
-      const res = await fetch(`${base}/api/jobs/${selectedJobId}/resumes/process`, {
-        method: "POST",
-        body: form,
-      });
-
-      const data = (await res.json().catch(() => null)) as
-        | {
-            summary?: { total: number; processed: number; failed: number };
-            results?: Array<
-              | {
-                  ok: true;
-                  originalName: string;
-                  applicantId: string;
-                  resumeFileId: string;
-                  resumeUrl: string;
-                }
-              | {
-                  ok: false;
-                  originalName: string;
-                  stage: string;
-                  reason: string;
-                }
-            >;
-            message?: string;
-          }
-        | null;
-
-      if (!res.ok) {
-        const msg = data?.message ?? "Failed to process resumes";
-        throw new Error(msg);
-      }
-
-      const results = data?.results ?? [];
-      const byName = new Map(results.map((r) => [r.originalName, r] as const));
-
-      setFiles((prev) =>
-        prev.map((f) => {
-          if (f.status !== "processing") return f;
-          const r = byName.get(f.name);
-          if (!r) return { ...f, status: "processed" };
-          if (r.ok) return { ...f, status: "processed", errorMsg: undefined };
-          return { ...f, status: "error", errorMsg: r.reason ?? "Processing failed" };
-        })
-      );
-
-      const processed = data?.summary?.processed ?? results.filter((r) => r.ok).length;
-      const failed = data?.summary?.failed ?? results.filter((r) => !r.ok).length;
-
-      toast.success(`Processed ${processed} resume${processed === 1 ? "" : "s"}`);
-      if (failed > 0) toast.error(`${failed} failed`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to process resumes";
-      toast.error(msg);
-
-      setFiles((prev) =>
-        prev.map((f) => (f.status === "processing" ? { ...f, status: "valid" } : f))
-      );
-    } finally {
-      setScreeningProgress("");
     }
+    setScreeningProgress("");
   };
 
   return (
-    <AppLayout>
-    <div className="page-container space-y-6">
+    <div className="p-6 space-y-4 max-w-5xl">
       <div>
-        <h1 className="page-title">Upload Applicants</h1>
-        <p className="page-subtitle">Import candidate data for AI-powered screening</p>
+        <h1 className="text-xl font-bold text-foreground tracking-tight">Talent Ingestion</h1>
+        <p className="text-muted-foreground mt-0.5 text-[10px] font-bold uppercase tracking-wider">
+          Batch process resumes with AI Intelligence
+        </p>
       </div>
 
-      <div className="glass-card p-5">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Target Job</p>
-            <p className="text-xs text-muted-foreground">
-              Resumes will be processed and saved under this job
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
-              className="h-10 rounded-xl border bg-card px-3 text-sm"
-              disabled={jobsLoading}
-            >
-              {jobs.length === 0 ? (
-                <option value="">{jobsLoading ? "Loading jobs..." : "No open jobs"}</option>
-              ) : (
-                jobs.map((j) => (
-                  <option key={j._id} value={j._id}>
-                    {j.title}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Format Guide */}
-      <div className="glass-card p-5 border-l-4 border-l-primary">
-        <div className="flex items-start gap-3">
-          <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-          <div className="space-y-3 text-sm">
-            <p className="font-semibold text-foreground">Accepted File Formats</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="font-medium text-foreground flex items-center gap-2">
-                  <Table className="w-4 h-4 text-primary" /> CSV Files
-                </p>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Must include columns:{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">name</code>,{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">email</code>.
-                  Optional:{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">skills</code>,{" "}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs font-mono">experience_years</code>
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium text-foreground flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-success" /> Excel (XLSX)
-                </p>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Same structure as CSV. First row must be headers. One candidate per row.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium text-foreground flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-destructive" /> PDF Resumes
-                </p>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Individual resume/CV files. AI will extract name, skills, and experience automatically.
-                </p>
-              </div>
+      <div className="bg-card border rounded-md p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <Target className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-foreground uppercase tracking-widest text-[9px]">Target Mission</p>
+              <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">Assign to specific job</p>
             </div>
           </div>
+          <select
+            value={selectedJobId}
+            onChange={(e) => setSelectedJobId(e.target.value)}
+            className="h-9 min-w-[220px] rounded-md border bg-accent/20 px-3 text-[11px] font-bold outline-none cursor-pointer"
+            disabled={jobsLoading}
+          >
+            {jobs.length === 0 ? (
+              <option value="">{jobsLoading ? "Loading..." : "No open jobs"}</option>
+            ) : (
+              jobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)
+            )}
+          </select>
         </div>
       </div>
 
-      {/* Drop Zone */}
       <div
         className={cn(
-          "glass-card border-2 border-dashed p-10 text-center transition-all duration-200 cursor-pointer",
-          dragActive
-            ? "border-primary bg-accent/60 scale-[1.01]"
-            : "border-border hover:border-primary/40"
+          "bg-card border-2 border-dashed rounded-md p-10 text-center transition-all group cursor-pointer relative overflow-hidden",
+          dragActive ? "border-primary bg-primary/5" : "border-accent hover:border-primary/40"
         )}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
-        onClick={handleBrowse}
+        onClick={() => fileInputRef.current?.click()}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          multiple
-          accept=".csv,.xlsx,.xls,.pdf"
-          onChange={(e) => processFiles(e.target.files)}
-        />
-        <div className="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center mx-auto mb-4">
-          <Upload className="w-6 h-6 text-accent-foreground" />
+        <input ref={fileInputRef} type="file" className="hidden" multiple accept=".csv,.xlsx,.xls,.pdf" onChange={(e) => processFiles(e.target.files)} />
+        
+        <div className="w-12 h-12 rounded-md bg-accent flex items-center justify-center mx-auto mb-3 transition-transform">
+          <Upload className="w-6 h-6 text-primary" />
         </div>
-        <p className="text-foreground font-semibold text-base">
-          {dragActive ? "Drop files here" : "Drag & drop files here"}
-        </p>
-        <p className="text-sm text-muted-foreground mt-1">
-          or{" "}
-          <span className="text-primary font-medium cursor-pointer">browse</span> to select files
-        </p>
-        <p className="text-xs text-muted-foreground mt-3">
-          CSV, XLSX, and PDF files up to 25MB each
-        </p>
+        <h3 className="text-sm font-bold text-foreground tracking-tight uppercase tracking-wider">Inhale Resumes</h3>
+        <p className="text-muted-foreground mt-1 text-[10px] font-bold uppercase tracking-widest opacity-60">PDF, CSV or XLSX (Max 25MB)</p>
+        <div className="mt-4 flex justify-center gap-1.5">
+          {["PDF", "CSV", "XLSX"].map(t => (
+            <Badge key={t} variant="outline" className="bg-white/50 px-1.5 py-0 rounded-sm font-bold border-accent/40 text-muted-foreground text-[8px]">{t}</Badge>
+          ))}
+        </div>
       </div>
 
-      {/* File List */}
       {files.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-foreground text-sm">
-              Uploaded Files ({files.length})
-              {validCount > 0 && (
-                <span className="ml-2 text-xs font-normal text-success">· {validCount} ready</span>
-              )}
-              {isValidating && (
-                <span className="ml-2 text-xs font-normal text-primary">· reading files...</span>
-              )}
+        <div className="bg-card border rounded-md overflow-hidden shadow-sm">
+          <div className="px-4 py-2.5 border-b flex items-center justify-between bg-accent/10">
+            <h3 className="font-bold text-[10px] text-foreground flex items-center gap-2 uppercase tracking-widest">
+              <FileSearch className="w-3.5 h-3.5 text-primary" />
+              Queue ({files.length})
             </h3>
-            {hasErrors && (
-              <span className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" /> Some files have issues
-              </span>
-            )}
+            {screeningProgress && <p className="text-[9px] font-bold text-primary animate-pulse uppercase tracking-wider">{screeningProgress}</p>}
           </div>
-          <div className="divide-y">
+          <div className="divide-y max-h-[240px] overflow-y-auto">
             {files.map((file) => (
-              <div
-                key={file.id}
-                className={cn(
-                  "flex items-center justify-between px-4 py-3 transition-colors",
-                  file.status === "error" && "bg-destructive/5"
-                )}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {fileIcon(file.type)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+              <div key={file.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/5 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center border",
+                    file.type === "pdf" ? "bg-red-50/50 border-red-100 text-red-500" : "bg-green-50/50 border-green-100 text-green-500"
+                  )}>
+                    {file.type === "pdf" ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <p className="font-bold text-foreground text-[11px] truncate max-w-[200px]">{file.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">{file.size}</span>
-                      {file.status === "validating" && (
-                        <span className="text-xs text-primary flex items-center gap-1">
-                          <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                          Reading...
-                        </span>
-                      )}
-                      {file.status === "valid" && (
-                        <span className="text-xs text-success flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Ready
-                          {file.rows ? " · " + file.rows + " candidates" : ""}
-                        </span>
-                      )}
-                      {file.status === "processing" && (
-                        <span className="text-xs text-primary flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Processing...
-                        </span>
-                      )}
-                      {file.status === "processed" && (
-                        <span className="text-xs text-success flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Saved
-                        </span>
-                      )}
-                      {file.status === "error" && (
-                        <span className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          {file.errorMsg}
-                        </span>
-                      )}
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase">{file.size}</span>
+                      {file.status === "validating" && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
+                      {file.status === "valid" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Ready</Badge>}
+                      {file.status === "processed" && <Badge className="bg-green-600/10 text-green-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
+                      {file.status === "error" && <Badge variant="destructive" className="text-[7px] font-bold uppercase rounded-sm px-1 py-0">{file.errorMsg}</Badge>}
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => removeFile(file.id)}
-                  className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground flex-shrink-0 ml-2"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <Button variant="ghost" size="icon" className="rounded-md h-7 w-7 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter(f => f.id !== file.id)); }}>
+                  <X className="w-3 h-3" />
+                </Button>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* CTA */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {validCount > 0
-              ? validCount + " file" + (validCount > 1 ? "s" : "") + " ready for screening"
-              : "Upload files to get started"}
-          </p>
-          {(isScreening || isProcessing) && screeningProgress && (
-            <p className="text-xs text-primary mt-0.5">{screeningProgress}</p>
-          )}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
+        <div className="flex items-center gap-2">
+           <Info className="w-3.5 h-3.5 text-primary" />
+           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">AI processes files in real-time.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
-            size="lg"
-            className="gap-2 rounded-xl px-6"
-            disabled={validCount === 0 || isValidating || isProcessing}
+            variant="outline"
+            className="flex-1 sm:flex-none rounded-md h-9 px-4 font-bold text-[11px] uppercase tracking-wider"
+            disabled={!files.some(f => f.status === "valid") || isScreening}
             onClick={handleProcessToJob}
           >
-            {isProcessing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
-            {isProcessing ? "Processing..." : "Process & Save"}
+            Start Analysis
           </Button>
           <Button
-            size="lg"
-            variant="outline"
-            className="gap-2 rounded-xl px-6"
-            disabled={screenableFiles.length === 0 || isScreening || isValidating || isProcessing}
+            className="flex-1 sm:flex-none rounded-md h-9 px-5 font-bold text-[11px] uppercase tracking-wider group"
+            disabled={!files.some(f => f.status === "processed") || isScreening}
             onClick={handleRunScreening}
           >
-            {isScreening ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Brain className="w-4 h-4" />
-            )}
-            {isScreening ? "Preparing..." : "Run AI Screening"}
+            Open Results
+            <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
           </Button>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Applicants() {
+  return (
+    <AppLayout>
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+        </div>
+      }>
+        <ApplicantsContent />
+      </Suspense>
     </AppLayout>
   );
 }

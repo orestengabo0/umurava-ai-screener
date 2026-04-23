@@ -1,154 +1,158 @@
 "use client";
 
-import Link from "next/link";
-import {
-    Briefcase,
-    Users,
-    Trophy,
-    Clock,
-    Plus,
-    ArrowRight,
+import { useEffect, useState } from "react";
+import { 
+  Briefcase, 
+  Users, 
+  CheckCircle, 
+  Clock, 
+  TrendingUp, 
+  ArrowUpRight,
+  Loader2
 } from "lucide-react";
-
 import { AppLayout } from "@/components/AppLayout";
-import { StatCard } from "@/components/StatCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
+import axios from "axios";
 
-const recentActivity = [
-    { id: 1, text: "New applicant for Senior React Developer", time: "2 min ago", type: "applicant" },
-    { id: 2, text: "AI screening completed for UX Designer role", time: "15 min ago", type: "screening" },
-    { id: 3, text: "Job posting published: Data Engineer", time: "1 hour ago", type: "job" },
-    { id: 4, text: "3 candidates shortlisted for PM role", time: "2 hours ago", type: "shortlist" },
-    { id: 5, text: "New applicant for Backend Engineer", time: "3 hours ago", type: "applicant" },
-];
-
-const dotColor: Record<string, string> = {
-    applicant: "bg-primary",
-    screening: "bg-success",
-    job: "bg-warning",
-    shortlist: "bg-info",
-};
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 export default function DashboardPage() {
-    const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/dashboard/stats`);
+        setStats(res.data);
+      } catch (err) {
+        console.error("Dashboard stats failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  if (loading) {
     return (
-        <AppLayout>
-            <div className="page-container space-y-8 p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="font-bold text-2xl">Dashboard</h1>
-                        <p className="text-gray-600 text-sm mt-1">
-                            Welcome back, Sarah. Here's your recruitment overview.
-                        </p>
-                    </div>
-
-                    <Button size={"lg"} onClick={() => {
-                        router.push("/jobs/create");
-                    }}>
-                        <Plus className="w-4 h-4" />
-                        Create New Job
-                    </Button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <StatCard title="Total Jobs" value={24} change="+3 this week" icon={Briefcase} trend="up" />
-                    <StatCard title="Total Applicants" value={482} change="+47 this week" icon={Users} trend="up" />
-                    <StatCard title="Screened Candidates" value={156} change="+12 today" icon={Trophy} trend="up" />
-                    <StatCard title="Avg. Screening Time" value="2.4s" change="-0.3s improvement" icon={Clock} trend="up" />
-                </div>
-
-                {/* Recent Activity */}
-                <div className="glass-card">
-                    <div className="flex items-center justify-between p-5 pb-0">
-                        <h2 className="text-base font-bold text-foreground">
-                            Recent Activity
-                        </h2>
-
-                        <Link
-                            href="/history"
-                            className="text-sm text-primary font-medium hover:underline"
-                        >
-                            View all
-                        </Link>
-                    </div>
-
-                    <div className="p-5 space-y-0">
-                        {recentActivity.map((item, i) => (
-                            <div
-                                key={item.id}
-                                className="flex items-center justify-between py-3.5 border-b last:border-0 animate-fade-in"
-                                style={{ animationDelay: `${i * 50}ms` }}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className={`w-2.5 h-2.5 rounded-full ${dotColor[item.type]} flex-shrink-0`}
-                                    />
-                                    <span className="text-sm text-foreground">
-                                        {item.text}
-                                    </span>
-                                </div>
-
-                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                                    {item.time}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {[
-                        {
-                            title: "Post a New Job",
-                            desc: "Create a job listing and start receiving applicants",
-                            link: "/jobs/create",
-                            icon: Briefcase,
-                        },
-                        {
-                            title: "Upload Applicants",
-                            desc: "Import CVs, spreadsheets, or add candidates manually",
-                            link: "/applicants",
-                            icon: Users,
-                        },
-                        {
-                            title: "View Results",
-                            desc: "Check AI-ranked shortlists and screening reports",
-                            link: "/results",
-                            icon: Trophy,
-                        },
-                    ].map((action, i) => (
-                        <Card key={action.title}>
-                            <Link
-                                key={action.title}
-                                href={action.link}
-                                className="glass-card p-6 group hover:border-primary/30 transition-all animate-fade-in"
-                                style={{ animationDelay: `${i * 80}ms` }}
-                            >
-                                <div className="w-11 h-11 rounded-xl bg-accent flex items-center justify-center mb-4">
-                                    <action.icon className="w-5 h-5 text-accent-foreground" />
-                                </div>
-
-                                <h3 className="font-bold text-foreground">
-                                    {action.title}
-                                </h3>
-
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    {action.desc}
-                                </p>
-
-                                <div className="flex items-center gap-1 mt-4 text-sm text-primary font-semibold group-hover:gap-2 transition-all">
-                                    Get started <ArrowRight className="w-4 h-4" />
-                                </div>
-                            </Link>
-                        </Card>
-                    ))}
-                </div>
-            </div>
-        </AppLayout>
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
     );
+  }
+
+  const kpis = [
+    { title: "Total Jobs", value: stats?.totalJobs || 0, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50" },
+    { title: "Open Jobs", value: stats?.openJobs || 0, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
+    { title: "Total Applicants", value: stats?.totalApplicants || 0, icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
+    { title: "Avg. Match Score", value: "78%", icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-50" },
+  ];
+
+  return (
+    <AppLayout>
+      <div className="space-y-6 p-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-0.5 text-xs font-medium">Welcome back! Here's what's happening today.</p>
+        </div>
+
+        {/* KPI Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map((kpi, i) => (
+            <Card key={i} className="border shadow-sm bg-card rounded-md">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={`p-2 rounded-md ${kpi.bg}`}>
+                  <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{kpi.title}</p>
+                  <h3 className="text-lg font-bold mt-0.5">{kpi.value}</h3>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Activity */}
+          <Card className="lg:col-span-2 border shadow-sm rounded-md">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-0">
+              <CardTitle className="text-base font-bold">Recent Ingestions</CardTitle>
+              <Button variant="ghost" size="sm" className="text-primary font-bold text-xs">View All</Button>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="space-y-2">
+                {stats?.recentApplicants?.map((app: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-md bg-accent/5 border border-transparent hover:border-accent transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
+                        {app.firstName?.[0]}{app.lastName?.[0]}
+                      </div>
+                      <div>
+                        <p className="font-bold text-foreground text-xs">{app.firstName} {app.lastName}</p>
+                        <p className="text-[10px] text-muted-foreground">{app.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-xs font-bold">{app.matchScore}% Match</p>
+                        <p className="text-[9px] text-muted-foreground">{new Date(app.uploadedAt).toLocaleDateString()}</p>
+                      </div>
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 rounded-sm text-[9px] px-1.5 py-0">
+                        Processed
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {(!stats?.recentApplicants || stats.recentApplicants.length === 0) && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                    <p className="text-xs">No recent activity found.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions / Stats */}
+          <div className="space-y-4">
+            <Card className="border shadow-sm bg-primary text-primary-foreground overflow-hidden relative rounded-md">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <TrendingUp className="w-12 h-12 rotate-12" />
+              </div>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base font-bold">AI Usage</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <p className="text-primary-foreground/80 mb-3 text-xs font-medium">You've saved roughly 12 hours this week.</p>
+                <div className="h-1 bg-white/20 rounded-md overflow-hidden">
+                  <div className="h-full bg-white w-3/4 rounded-md" />
+                </div>
+                <p className="mt-1.5 text-[9px] font-bold uppercase tracking-wider">75% of your quota used</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border shadow-sm rounded-md">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-2">
+                <Button className="w-full justify-start rounded-md h-9 text-xs font-bold" variant="outline" asChild>
+                  <a href="/jobs/create">Create New Job</a>
+                </Button>
+                <Button className="w-full justify-start rounded-md h-9 text-xs font-bold" variant="outline" asChild>
+                  <a href="/applicants">Batch Screen Resumes</a>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </AppLayout>
+  );
 }

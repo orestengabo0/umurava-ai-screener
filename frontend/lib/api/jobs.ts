@@ -43,11 +43,28 @@ async function handle<T>(res: Response): Promise<T> {
 
 // ── API functions ──────────────────────────────────────────────────────────────
 
-export async function getJobs(status?: JobStatus): Promise<Job[]> {
+export interface GetJobsResponse {
+  jobs: Job[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function getJobs(params?: { 
+  status?: JobStatus; 
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<GetJobsResponse> {
   const url = new URL(`${BASE}/api/jobs`);
-  if (status) url.searchParams.set("status", status);
+  if (params?.status) url.searchParams.set("status", params.status);
+  if (params?.search) url.searchParams.set("search", params.search);
+  if (params?.page) url.searchParams.set("page", params.page.toString());
+  if (params?.limit) url.searchParams.set("limit", params.limit.toString());
+  
   const res = await fetch(url.toString(), { cache: "no-store" });
-  return handle<Job[]>(res);
+  return handle<GetJobsResponse>(res);
 }
 
 export async function getJob(id: string): Promise<Job> {

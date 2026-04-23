@@ -41,8 +41,10 @@ export const uploadFile = async (file: File): Promise<UploadResponse> => {
   return response.data;
 };
 
-export const getApplicants = async () => {
-  const response = await apiClient.get("/applicants");
+export const getApplicants = async (jobId?: string) => {
+  const response = await apiClient.get("/applicants", {
+    params: jobId ? { jobId } : {},
+  });
   return response.data;
 };
 
@@ -51,8 +53,18 @@ export const getApplicantById = async (id: string) => {
   return response.data;
 };
 
+export const chatWithApplicant = async (id: string, message: string) => {
+  const response = await apiClient.post(`/applicants/${id}/chat`, { message });
+  return response.data;
+};
+
 export const deleteApplicant = async (id: string) => {
   const response = await apiClient.delete(`/applicants/${id}`);
+  return response.data;
+};
+
+export const deleteAllApplicantsForJob = async (jobId: string) => {
+  const response = await apiClient.delete(`/applicants/job/${jobId}`);
   return response.data;
 };
 

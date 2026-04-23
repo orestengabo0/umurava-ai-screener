@@ -12,17 +12,17 @@ interface StatCardProps {
 
 export function StatCard({ title, value, change, icon: Icon, trend = "neutral" }: StatCardProps) {
   return (
-    <Card className="p-4">
+    <Card className="p-4 rounded-md shadow-sm border">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-muted-foreground font-semibold">{title}</p>
-          <p className="text-3xl font-extrabold text-foreground mt-2 tracking-tight">{value}</p>
+          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{title}</p>
+          <p className="text-xl font-bold text-foreground mt-1 tracking-tight">{value}</p>
           {change && (
             <p
               className={cn(
-                "text-xs font-medium mt-2",
-                trend === "up" && "text-success",
-                trend === "down" && "text-destructive",
+                "text-[8px] font-black mt-1 uppercase tracking-widest",
+                trend === "up" && "text-blue-600",
+                trend === "down" && "text-slate-400",
                 trend === "neutral" && "text-muted-foreground"
               )}
             >
@@ -30,8 +30,8 @@ export function StatCard({ title, value, change, icon: Icon, trend = "neutral" }
             </p>
           )}
         </div>
-        <div className="w-11 h-11 rounded-xl bg-accent flex items-center justify-center">
-          <Icon className="w-5 h-5 text-[#1b6df2]" />
+        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20">
+          <Icon className="w-3.5 h-3.5 text-primary" />
         </div>
       </div>
     </Card>
