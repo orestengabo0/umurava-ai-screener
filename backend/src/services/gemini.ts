@@ -15,6 +15,21 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return cachedClient;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableGeminiError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    message.includes("503") ||
+    message.includes("429") ||
+    message.toLowerCase().includes("service unavailable") ||
+    message.toLowerCase().includes("high demand") ||
+    message.toLowerCase().includes("rate")
+  );
+}
+
 export async function generateJsonFromResumeText(params: {
   resumeText: string;
   jobContext?: {
@@ -31,7 +46,17 @@ export async function generateJsonFromResumeText(params: {
 }): Promise<string> {
   const { resumeText, jobContext } = params;
 
-  const model = getGeminiClient().getGenerativeModel({ model: "gemini-1.5-flash" });
+  const preferredModel = process.env.GEMINI_MODEL?.trim();
+  const modelsToTry = [
+    preferredModel && preferredModel.length > 0
+      ? preferredModel
+      : "gemma-3-27b-it",
+    "gemma-3-12b-it",
+    "gemini-2.0-flash",
+  ];
+
+  const maxAttemptsPerModel = Number(process.env.GEMINI_MAX_RETRIES ?? 2);
+  const baseDelayMs = Number(process.env.GEMINI_RETRY_DELAY_MS ?? 400);
 
   const jobBlock = jobContext
     ? `JOB CONTEXT (for disambiguation only; do NOT invent data that is not in the resume):\n${JSON.stringify(
@@ -80,6 +105,29 @@ RESUME TEXT:
 ${resumeText}
 `;
 
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  let lastError: unknown;
+
+  for (const modelName of modelsToTry) {
+    const model = getGeminiClient().getGenerativeModel({ model: modelName });
+
+    for (let attempt = 0; attempt <= maxAttemptsPerModel; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+      } catch (err) {
+        lastError = err;
+
+        if (!isRetryableGeminiError(err) || attempt === maxAttemptsPerModel) {
+          break;
+        }
+
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Gemini request failed");
 }
