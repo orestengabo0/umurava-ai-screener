@@ -13,19 +13,20 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { extractFileText } from "@/lib/file-parsers";
 import { AppLayout } from "@/components/AppLayout";
+import { getJobs, type Job } from "@/lib/api/jobs";
 
 interface UploadedFile {
   id: number;
   name: string;
   size: string;
   type: "pdf" | "csv" | "xlsx";
-  status: "validating" | "valid" | "error";
+  status: "validating" | "valid" | "processing" | "processed" | "error";
   rows?: number;
   errorMsg?: string;
   rawFile: File;
@@ -53,6 +54,10 @@ export default function Applicants() {
   const [idCounter, setIdCounter] = useState(1);
   const [isScreening, setIsScreening] = useState(false);
   const [screeningProgress, setScreeningProgress] = useState("");
+
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string>("");
 
   const processFiles = (fileList: FileList | null) => {
     if (!fileList) return;
@@ -146,9 +151,27 @@ export default function Applicants() {
   const removeFile = (id: number) => setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const validFiles = files.filter((f) => f.status === "valid");
+  const screenableFiles = files.filter(
+    (f) => f.status === "valid" || f.status === "processed"
+  );
+
   const validCount = validFiles.length;
   const hasErrors = files.some((f) => f.status === "error");
   const isValidating = files.some((f) => f.status === "validating");
+  const isProcessing = files.some((f) => f.status === "processing");
+
+  useEffect(() => {
+    setJobsLoading(true);
+    getJobs("open")
+      .then((data) => {
+        setJobs(data);
+        if (!selectedJobId && data.length > 0) setSelectedJobId(data[0]._id);
+      })
+      .catch(() => {
+        // ignore here; user can still paste/select later
+      })
+      .finally(() => setJobsLoading(false));
+  }, [selectedJobId]);
 
   const fileIcon = (type: string) => {
     if (type === "pdf") return <FileText className="w-5 h-5 text-destructive" />;
@@ -157,14 +180,14 @@ export default function Applicants() {
   };
 
   const handleRunScreening = async () => {
-    if (validCount === 0) return;
+    if (screenableFiles.length === 0) return;
     setIsScreening(true);
 
     try {
       // Combine all extracted text from valid files
       const sections: string[] = [];
 
-      for (const f of validFiles) {
+      for (const f of screenableFiles) {
         setScreeningProgress("Reading " + f.name + "...");
         const label =
           f.type === "pdf"
@@ -192,12 +215,127 @@ export default function Applicants() {
     }
   };
 
+  const handleProcessToJob = async () => {
+    if (validCount === 0) return;
+
+    if (!selectedJobId) {
+      toast.error("Select a job first.");
+      return;
+    }
+
+    setFiles((prev) =>
+      prev.map((f) => (f.status === "valid" ? { ...f, status: "processing" } : f))
+    );
+
+    setScreeningProgress("Uploading & processing...");
+
+    try {
+      const baseRaw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+      const base = baseRaw.endsWith("/api") ? baseRaw.slice(0, -4) : baseRaw;
+
+      const form = new FormData();
+      for (const f of validFiles) {
+        // backend expects field name: files
+        form.append("files", f.rawFile, f.rawFile.name);
+      }
+
+      const res = await fetch(`${base}/api/jobs/${selectedJobId}/resumes/process`, {
+        method: "POST",
+        body: form,
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | {
+            summary?: { total: number; processed: number; failed: number };
+            results?: Array<
+              | {
+                  ok: true;
+                  originalName: string;
+                  applicantId: string;
+                  resumeFileId: string;
+                  resumeUrl: string;
+                }
+              | {
+                  ok: false;
+                  originalName: string;
+                  stage: string;
+                  reason: string;
+                }
+            >;
+            message?: string;
+          }
+        | null;
+
+      if (!res.ok) {
+        const msg = data?.message ?? "Failed to process resumes";
+        throw new Error(msg);
+      }
+
+      const results = data?.results ?? [];
+      const byName = new Map(results.map((r) => [r.originalName, r] as const));
+
+      setFiles((prev) =>
+        prev.map((f) => {
+          if (f.status !== "processing") return f;
+          const r = byName.get(f.name);
+          if (!r) return { ...f, status: "processed" };
+          if (r.ok) return { ...f, status: "processed", errorMsg: undefined };
+          return { ...f, status: "error", errorMsg: r.reason ?? "Processing failed" };
+        })
+      );
+
+      const processed = data?.summary?.processed ?? results.filter((r) => r.ok).length;
+      const failed = data?.summary?.failed ?? results.filter((r) => !r.ok).length;
+
+      toast.success(`Processed ${processed} resume${processed === 1 ? "" : "s"}`);
+      if (failed > 0) toast.error(`${failed} failed`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to process resumes";
+      toast.error(msg);
+
+      setFiles((prev) =>
+        prev.map((f) => (f.status === "processing" ? { ...f, status: "valid" } : f))
+      );
+    } finally {
+      setScreeningProgress("");
+    }
+  };
+
   return (
     <AppLayout>
     <div className="page-container space-y-6">
       <div>
         <h1 className="page-title">Upload Applicants</h1>
         <p className="page-subtitle">Import candidate data for AI-powered screening</p>
+      </div>
+
+      <div className="glass-card p-5">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Target Job</p>
+            <p className="text-xs text-muted-foreground">
+              Resumes will be processed and saved under this job
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedJobId}
+              onChange={(e) => setSelectedJobId(e.target.value)}
+              className="h-10 rounded-xl border bg-card px-3 text-sm"
+              disabled={jobsLoading}
+            >
+              {jobs.length === 0 ? (
+                <option value="">{jobsLoading ? "Loading jobs..." : "No open jobs"}</option>
+              ) : (
+                jobs.map((j) => (
+                  <option key={j._id} value={j._id}>
+                    {j.title}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Format Guide */}
@@ -327,6 +465,18 @@ export default function Applicants() {
                           {file.rows ? " · " + file.rows + " candidates" : ""}
                         </span>
                       )}
+                      {file.status === "processing" && (
+                        <span className="text-xs text-primary flex items-center gap-1">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Processing...
+                        </span>
+                      )}
+                      {file.status === "processed" && (
+                        <span className="text-xs text-success flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Saved
+                        </span>
+                      )}
                       {file.status === "error" && (
                         <span className="text-xs text-destructive flex items-center gap-1">
                           <AlertCircle className="w-3.5 h-3.5" />
@@ -356,23 +506,39 @@ export default function Applicants() {
               ? validCount + " file" + (validCount > 1 ? "s" : "") + " ready for screening"
               : "Upload files to get started"}
           </p>
-          {isScreening && screeningProgress && (
+          {(isScreening || isProcessing) && screeningProgress && (
             <p className="text-xs text-primary mt-0.5">{screeningProgress}</p>
           )}
         </div>
-        <Button
-          size="lg"
-          className="gap-2 rounded-xl px-6 shrink-0"
-          disabled={validCount === 0 || isScreening || isValidating}
-          onClick={handleRunScreening}
-        >
-          {isScreening ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Brain className="w-4 h-4" />
-          )}
-          {isScreening ? "Preparing..." : "Run AI Screening"}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+          <Button
+            size="lg"
+            className="gap-2 rounded-xl px-6"
+            disabled={validCount === 0 || isValidating || isProcessing}
+            onClick={handleProcessToJob}
+          >
+            {isProcessing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            {isProcessing ? "Processing..." : "Process & Save"}
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2 rounded-xl px-6"
+            disabled={screenableFiles.length === 0 || isScreening || isValidating || isProcessing}
+            onClick={handleRunScreening}
+          >
+            {isScreening ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Brain className="w-4 h-4" />
+            )}
+            {isScreening ? "Preparing..." : "Run AI Screening"}
+          </Button>
+        </div>
       </div>
     </div>
     </AppLayout>
