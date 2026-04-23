@@ -184,5 +184,40 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/jobs/{jobId}/resumes/process": {
+      post: {
+        summary: "Parse resumes with Gemini then upload to cloudinary",
+        parameters: [
+          {
+            name: "jobId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                properties: {
+                  files: {
+                    type: "array",
+                    items: { type: "string", format: "binary" },
+                  },
+                },
+                required: ["files"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "OK" },
+          "400": { description: "Bad Request" },
+          "404": { description: "Not Found" },
+        },
+      },
+    },
   },
 } as const;
