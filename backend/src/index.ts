@@ -8,10 +8,12 @@ import express, {
   type NextFunction,
 } from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 import { connectDB } from "./config/db.ts";
 import jobRoutes from "./routes/jobRoutes.ts";
 import applicantRoutes from "./routes/applicantRoutes.ts";
 import resumeRoutes from "./routes/resumeRoutes.ts";
+import { openApiSpec } from "./swagger.ts";
 
 async function bootstrap() {
   const port = Number(process.env.PORT ?? 5000);
@@ -32,6 +34,18 @@ async function bootstrap() {
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
+
+  app.get("/api-docs.json", (_req, res) => {
+    res.status(200).json(openApiSpec);
+  });
+
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(openApiSpec, {
+      explorer: true,
+    }),
+  );
 
   app.use("/api/jobs", jobRoutes);
   app.use("/api/applicants", applicantRoutes);

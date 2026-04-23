@@ -161,6 +161,17 @@ const applicantSchema = new Schema<IApplicant>({
   fileName: { type: String, required: true },
 });
 
+applicantSchema.index(
+  { jobId: 1, email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      jobId: { $type: "string" },
+      email: { $type: "string" },
+    },
+  }
+);
+
 export const Applicant = mongoose.model<IApplicant>(
   "Applicant",
   applicantSchema,

@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
+import { Types } from "mongoose";
 import { Applicant } from "../models/Applicant.ts";
+import { ResumeFileModel } from "../models/ResumeFile.ts";
+import { deleteRawAsset } from "../services/cloudinary.ts";
 
 export const uploadApplicants = async (req: Request, res: Response) => {
   try {
@@ -80,6 +83,11 @@ export const getApplicants = async (req: Request, res: Response) => {
 export const getApplicantById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    if (typeof id !== "string" || !id) {
+      return res.status(400).json({ message: "Applicant id is required" });
+    }
+
     const applicant = await Applicant.findById(id);
 
     if (!applicant) {
@@ -100,11 +108,31 @@ export const deleteApplicant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    if (typeof id !== "string" || !id) {
+      return res.status(400).json({ message: "Applicant id is required" });
+    }
+
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid applicant id" });
+    }
+
+    const applicantObjectId = new Types.ObjectId(id);
+
+    const resumeFiles = await ResumeFileModel.find({
+      applicantId: applicantObjectId,
+    }).lean();
+
     const applicant = await Applicant.findByIdAndDelete(id);
 
     if (!applicant) {
       return res.status(404).json({ message: "Applicant not found" });
     }
+
+    await ResumeFileModel.deleteMany({ applicantId: applicantObjectId });
+
+    await Promise.allSettled(
+      resumeFiles.map((rf) => deleteRawAsset(rf.cloudinaryPublicId))
+    );
 
     res.status(200).json({
       message: "Applicant deleted successfully",
