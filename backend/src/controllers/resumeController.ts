@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import pLimit from "p-limit";
-import { PDFParse} from "pdf-parse";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { JobModel } from "../models/Job.ts";
 import { applicantParseSchema } from "../services/applicantParseSchema.ts";
 import { generateJsonFromResumeText } from "../services/gemini.ts";
@@ -8,6 +8,23 @@ import { generateJsonFromResumeText } from "../services/gemini.ts";
 const MIN_EXTRACTED_TEXT_LENGTH = 300;
 const EXTRACT_CONCURRENCY = 4;
 const AI_CONCURRENCY = 3;
+
+async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdf = await loadingTask.promise;
+  const pageTexts: string[] = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .join(" ");
+    pageTexts.push(pageText);
+  }
+
+  return pageTexts.join("\n");
+}
 
 function extractFirstJsonObject(text: string): string {
   const start = text.indexOf("{");
@@ -42,8 +59,7 @@ export async function ingestResumesExtractText(
     const settled = await Promise.allSettled(
       files.map((file) =>
         limit(async () => {
-          const parsed = await( new PDFParse(file.buffer)).getText();
-          const text = (parsed.text ?? "").trim();
+          const text = (await extractTextFromPdf(new Uint8Array(file.buffer))).trim();
           const textLength = text.length;
 
           if (textLength < MIN_EXTRACTED_TEXT_LENGTH) {
@@ -69,13 +85,15 @@ export async function ingestResumesExtractText(
       )
     );
 
-    const results = settled.map((r) => {
+    const results = settled.map((r, idx) => {
       if (r.status === "fulfilled") return r.value;
+      const file = files[idx];
       return {
         ok: false as const,
-        originalName: "unknown",
-        size: 0,
-        mimeType: "application/pdf",
+        stage: "extract" as const,
+        originalName: file?.originalname ?? "unknown",
+        size: file?.size ?? 0,
+        mimeType: file?.mimetype ?? "application/pdf",
         textLength: 0,
         reason: r.reason instanceof Error ? r.reason.message : "Extraction failed",
       };
@@ -124,8 +142,7 @@ export async function ingestResumesParseWithGemini(
     const settled = await Promise.allSettled(
       files.map((file) =>
         extractLimit(async () => {
-          const parsed = await( new PDFParse(file.buffer)).getText();
-          const resumeText = (parsed.text ?? "").trim();
+          const resumeText = (await extractTextFromPdf(new Uint8Array(file.buffer))).trim();
           const textLength = resumeText.length;
 
           if (textLength < MIN_EXTRACTED_TEXT_LENGTH) {
@@ -189,14 +206,15 @@ export async function ingestResumesParseWithGemini(
       )
     );
 
-    const results = settled.map((r) => {
+    const results = settled.map((r, idx) => {
       if (r.status === "fulfilled") return r.value;
+      const file = files[idx];
       return {
         ok: false as const,
         stage: "unknown" as const,
-        originalName: "unknown",
-        size: 0,
-        mimeType: "application/pdf",
+        originalName: file?.originalname ?? "unknown",
+        size: file?.size ?? 0,
+        mimeType: file?.mimetype ?? "application/pdf",
         textLength: 0,
         reason: r.reason instanceof Error ? r.reason.message : "Processing failed",
       };
