@@ -25,7 +25,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/dashboard/stats`);
+        const res = await axios.get(`${API_BASE_URL}/api/dashboard/stats`);
         setStats(res.data);
       } catch (err) {
         console.error("Dashboard stats failed", err);
