@@ -12,7 +12,8 @@ import {
   Award, 
   Bot,
   X,
-  MessageSquare
+  MessageSquare,
+  Sparkles
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { getApplicantById } from "@/lib/api/applicants";
@@ -109,7 +110,7 @@ export default function ApplicantDetailPage() {
             {/* AI Recommendation */}
             <div className="bg-primary/5 border border-primary/20 rounded-md p-4 shadow-sm">
               <h3 className="font-bold text-primary flex items-center gap-2 mb-2 text-[9px] uppercase tracking-widest">
-                <Award className="w-3 h-3" /> AI Insights
+                <Sparkles className="w-3 h-3" /> AI Insights
               </h3>
               <p className="text-foreground leading-relaxed font-medium text-[11px]">
                 {data.aiSummary}

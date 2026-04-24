@@ -181,7 +181,7 @@ export default function JobResultsPage() {
                         {c.recommendation}
                       </Badge>
                     </div>
-                    <p className="text-[10px] font-medium text-muted-foreground mt-0.5 uppercase tracking-wider">{c.email}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground mt-0.5 tracking-wider">{c.email}</p>
                   </div>
                   <div className="w-32 hidden md:block">
                     <MatchScoreBar score={c.matchScore} />
@@ -207,19 +207,24 @@ export default function JobResultsPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-[9px] font-bold text-foreground uppercase tracking-widest flex items-center gap-1.5">
-                          <AlertTriangle className="w-3 h-3 text-warning" />
-                          Gaps
-                        </p>
-                        <div className="flex flex-wrap gap-1">
-                          {c.gaps?.map((g: string) => (
-                            <Badge key={g} variant="outline" className="bg-warning/5 text-warning border-warning/20 py-0.5 px-1.5 rounded-sm font-bold text-[9px]">
-                              {g}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                      <div className="space-y-3">
+  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+    <AlertTriangle className="w-4 h-4 text-muted-foreground" />
+    Gaps
+  </p>
+
+  <div className="flex flex-wrap gap-2">
+    {c.gaps?.map((g: string) => (
+      <Badge
+        key={g}
+        variant="outline"
+        className="bg-muted text-foreground border-border px-2.5 py-1 rounded-md text-xs font-medium"
+      >
+        {g}
+      </Badge>
+    ))}
+  </div>
+</div>
                     </div>
                     
                     <div className="bg-white border rounded-md p-3 shadow-sm">

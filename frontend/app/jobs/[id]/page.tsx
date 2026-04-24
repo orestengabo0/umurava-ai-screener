@@ -16,12 +16,15 @@ import {
   History,
   Layout,
   ExternalLink,
-  Target
+  Target,
+  Pen,
+  Plus,
+  X
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { getJob, setJobStatus, deleteJob, type Job, type JobStatus } from "@/lib/api/jobs";
+import { getJob, setJobStatus, deleteJob, updateJob, type Job, type JobStatus } from "@/lib/api/jobs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +45,11 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Job>>({});
+  const [customSkill, setCustomSkill] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -78,6 +86,32 @@ export default function JobDetailPage() {
     } finally {
       setActionLoading(false);
       setIsDeleting(false);
+    }
+  };
+
+  const handleEditClick = () => {
+    if (!job) return;
+    setEditForm({
+      title: job.title,
+      location: job.location || "",
+      description: job.description,
+      requiredSkills: job.requiredSkills || [],
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!job) return;
+    setIsSaving(true);
+    try {
+      const updated = await updateJob(job._id, editForm as any);
+      setJob(updated);
+      setIsEditing(false);
+      toast.success("Job updated successfully");
+    } catch (err) {
+      toast.error("Failed to update job");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -119,49 +153,142 @@ export default function JobDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-card border rounded-md p-6 shadow-sm relative overflow-hidden">
               <div className="flex flex-wrap items-start justify-between gap-4 relative z-10">
-                <div className="space-y-2">
+                <div className="space-y-2 w-full pr-10">
                   <Badge className={cn(
                     "rounded-sm px-1.5 py-0.5 font-bold text-[8px] uppercase tracking-wider",
                     job.status === "open" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500"
                   )}>
                     {job.status}
                   </Badge>
-                  <h1 className="text-xl font-bold text-foreground tracking-tight leading-tight">
-                    {job.title}
-                  </h1>
+
+                  {isEditing ? (
+                    <input
+                      value={editForm.title || ""}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full text-xl font-bold tracking-tight leading-tight border rounded-md px-3 py-1.5 mt-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      placeholder="Job Title"
+                    />
+                  ) : (
+                    <h1 className="text-xl font-bold text-foreground tracking-tight leading-tight pr-8">
+                      {job.title}
+                    </h1>
+                  )}
+                  
                   <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground pt-1 uppercase tracking-wider">
                     <span className="flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-primary" /> {job.location || "Remote"}
+                      <MapPin className="w-3 h-3 text-primary" /> 
+                      {isEditing ? (
+                        <input
+                           value={editForm.location || ""}
+                           onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+                           className="border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                           placeholder="Location (e.g. Remote)"
+                        />
+                      ) : (
+                        job.location || "Remote"
+                      )}
                     </span>
                     <span className="flex items-center gap-1.5 border-l pl-4">
                       <Calendar className="w-3 h-3 text-primary" /> {fmt(job.createdAt)}
                     </span>
                   </div>
                 </div>
+
+                {!isEditing && (
+                   <Button 
+                     variant="ghost" 
+                     size="icon" 
+                     onClick={handleEditClick} 
+                     className="absolute right-0 top-0 rounded-md text-muted-foreground hover:text-primary transition-colors"
+                   >
+                     <Pen className="w-4 h-4" />
+                   </Button>
+                )}
               </div>
 
               <div className="mt-8 space-y-2 relative z-10">
                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <Layout className="w-3 h-3" /> Description
                 </h3>
-                <p className="text-foreground font-medium leading-relaxed whitespace-pre-wrap text-xs">
-                  {job.description}
-                </p>
+                {isEditing ? (
+                   <textarea
+                     value={editForm.description || ""}
+                     onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                     className="w-full min-h-[200px] border rounded-md p-3 text-xs bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                     placeholder="Job description..."
+                   />
+                ) : (
+                   <p className="text-foreground font-medium leading-relaxed whitespace-pre-wrap text-xs">
+                     {job.description}
+                   </p>
+                )}
               </div>
 
-              {job.requiredSkills.length > 0 && (
+              {(job.requiredSkills?.length > 0 || isEditing) && (
                 <div className="mt-8 pt-6 border-t space-y-2">
                   <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <Tag className="w-3 h-3" /> Tech Stack
                   </h3>
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {job.requiredSkills.map((skill) => (
-                      <Badge key={skill} variant="secondary" className="px-2 py-0.5 rounded-sm bg-accent/50 text-primary border-none font-bold text-[10px]">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(isEditing ? editForm.requiredSkills || [] : job.requiredSkills).map((skill) => (
+                      <Badge key={skill} variant="secondary" className="px-2 py-1 rounded-sm bg-accent/50 text-primary border-none font-bold text-[10px] flex items-center gap-1">
                         {skill}
+                        {isEditing && (
+                          <X 
+                            className="w-3 h-3 cursor-pointer hover:text-destructive opacity-70 hover:opacity-100" 
+                            onClick={() => setEditForm(prev => ({ ...prev, requiredSkills: prev.requiredSkills?.filter(s => s !== skill) }))} 
+                          />
+                        )}
                       </Badge>
                     ))}
                   </div>
+                  
+                  {isEditing && (
+                     <div className="flex gap-2 mt-3 items-center">
+                       <input 
+                         value={customSkill}
+                         onChange={(e) => setCustomSkill(e.target.value)}
+                         placeholder="Add tech skill..."
+                         className="border rounded-md px-3 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                         onKeyDown={(e) => {
+                           if (e.key === "Enter" && customSkill.trim()) {
+                             e.preventDefault();
+                             if (!editForm.requiredSkills?.includes(customSkill.trim())) {
+                               setEditForm(prev => ({ ...prev, requiredSkills: [...(prev.requiredSkills || []), customSkill.trim()] }));
+                             }
+                             setCustomSkill("");
+                           }
+                         }}
+                       />
+                       <Button 
+                         type="button" 
+                         variant="secondary" 
+                         size="sm" 
+                         className="h-8 text-[10px] font-bold rounded-md px-3"
+                         onClick={() => {
+                           if (customSkill.trim() && !editForm.requiredSkills?.includes(customSkill.trim())) {
+                             setEditForm(prev => ({ ...prev, requiredSkills: [...(prev.requiredSkills || []), customSkill.trim()] }));
+                             setCustomSkill("");
+                           }
+                         }}
+                       >
+                         <Plus className="w-3 h-3 mr-1" /> Add
+                       </Button>
+                     </div>
+                  )}
                 </div>
+              )}
+
+              {isEditing && (
+                 <div className="mt-8 pt-4 border-t flex justify-end gap-3">
+                   <Button variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving} className="rounded-md text-[11px] font-bold h-9">
+                     Cancel
+                   </Button>
+                   <Button onClick={handleSave} disabled={isSaving} className="rounded-md text-[11px] font-bold h-9">
+                     {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
+                     Save Changes
+                   </Button>
+                 </div>
               )}
             </div>
           </div>
@@ -199,18 +326,27 @@ export default function JobDetailPage() {
                   >
                     <History className="w-3 h-3" /> History
                   </Button>
-                  <Button 
-                    variant="secondary" 
-                    className={cn(
-                      "rounded-md h-9 font-bold gap-2 text-[10px]",
-                      job.status === "open" ? "text-orange-600 bg-orange-50 hover:bg-orange-100" : "text-blue-600 bg-blue-50 hover:bg-blue-100"
-                    )}
-                    onClick={handleToggleStatus}
-                    disabled={actionLoading}
-                  >
-                    {actionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : job.status === "open" ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
-                    {job.status === "open" ? "Close" : "Reopen"}
-                  </Button>
+                 <Button 
+  variant="secondary"
+  className={cn(
+    "rounded-md h-9 font-semibold gap-2 text-xs transition-all",
+    job.status === "open"
+      ? "text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100"
+      : "text-blue-500 bg-blue-50/60 border border-blue-100 hover:bg-blue-50"
+  )}
+  onClick={handleToggleStatus}
+  disabled={actionLoading}
+>
+  {actionLoading ? (
+    <Loader2 className="w-3 h-3 animate-spin" />
+  ) : job.status === "open" ? (
+    <ToggleRight className="w-3.5 h-3.5" />
+  ) : (
+    <ToggleLeft className="w-3.5 h-3.5 opacity-70" />
+  )}
+
+  {job.status === "open" ? "Close" : "Reopen"}
+</Button>
                 </div>
 
                 <Button 
