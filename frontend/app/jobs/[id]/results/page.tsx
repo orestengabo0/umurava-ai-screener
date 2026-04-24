@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import axios from "axios";
+import { getToken } from "@/lib/api/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -93,6 +94,7 @@ export default function JobResultsPage() {
     setChatLoading(true);
 
     try {
+      const token = getToken();
       const res = await axios.post(`${API_BASE_URL}/jobs/${jobId}/chat-results`, { 
         message: msg,
         context: applicants.map(a => ({
@@ -103,10 +105,14 @@ export default function JobResultsPage() {
           strengths: a.strengths,
           gaps: a.gaps
         }))
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       setChatMessages(prev => [...prev, { role: "assistant", content: res.data.response }]);
     } catch (err) {
-      toast.error("Chat failed");
+      toast.error("chat failed. Please check if your gemini key is valid and not expired");
     } finally {
       setChatLoading(false);
     }

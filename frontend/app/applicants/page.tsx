@@ -21,6 +21,7 @@ import { extractFileText } from "@/lib/file-parsers";
 import { AppLayout } from "@/components/AppLayout";
 import { getJobs, type Job } from "@/lib/api/jobs";
 import { Badge } from "@/components/ui/badge";
+import { getToken } from "@/lib/api/auth";
 
 interface UploadedFile {
   id: string;
@@ -184,8 +185,12 @@ function ApplicantsContent() {
       try {
         const form = new FormData();
         form.append("files", f.rawFile, f.rawFile.name);
+        const token = getToken();
         const res = await fetch(`${base}/api/jobs/${selectedJobId}/resumes/process`, {
           method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: form,
         });
         const data = await res.json();

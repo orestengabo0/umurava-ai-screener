@@ -181,6 +181,7 @@ export async function ingestResumesProcess(
                   ? { educationLevel: job.educationLevel }
                   : {}),
               },
+              userId: (req as any).user?.userId,
             })
           );
 
@@ -440,6 +441,7 @@ export async function ingestResumesParseWithGemini(
                   ? { educationLevel: job.educationLevel }
                   : {}),
               },
+              userId: (req as any).user?.userId,
             })
           );
 

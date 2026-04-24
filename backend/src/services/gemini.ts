@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { SettingsModel } from "../models/Settings.ts";
 
 let genAI: GoogleGenerativeAI | null = null;
 
-export function getGeminiClient(): GoogleGenerativeAI {
+export function getGeminiClient(userId?: string): GoogleGenerativeAI {
   if (!genAI) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -11,6 +12,29 @@ export function getGeminiClient(): GoogleGenerativeAI {
     genAI = new GoogleGenerativeAI(apiKey);
   }
   return genAI;
+}
+
+export async function getGeminiClientForUser(userId: string): Promise<{ client: GoogleGenerativeAI; model: string }> {
+  // Try to get user's settings from database
+  const settings = await SettingsModel.findOne({ userId, isActive: true });
+  
+  if (settings && settings.geminiApiKey) {
+    return {
+      client: new GoogleGenerativeAI(settings.geminiApiKey),
+      model: settings.geminiModel || "gemini-2.5-flash-lite",
+    };
+  }
+  
+  // Fallback to environment variable
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("No Gemini API key configured. Please add your API key in Settings.");
+  }
+  
+  return {
+    client: new GoogleGenerativeAI(apiKey),
+    model: "gemini-2.5-flash-lite",
+  };
 }
 
 interface GenerateJsonParams {
@@ -26,13 +50,19 @@ interface GenerateJsonParams {
     location?: string;
     educationLevel?: string;
   };
+  userId?: string;
 }
 
 export async function generateJsonFromResumeText({
   resumeText,
   jobContext,
+  userId,
 }: GenerateJsonParams): Promise<string> {
-  const modelsToTry = ["gemini-2.5-flash-lite"];
+  const { client, model: defaultModel } = userId 
+    ? await getGeminiClientForUser(userId)
+    : { client: getGeminiClient(), model: "gemini-2.5-flash-lite" };
+  
+  const modelsToTry = [defaultModel];
   const maxAttemptsPerModel = 1;
 
   let jobBlock = "";
@@ -144,7 +174,7 @@ export async function generateJsonFromResumeText({
   let lastError: unknown;
 
   for (const modelName of modelsToTry) {
-    const model = getGeminiClient().getGenerativeModel({ model: modelName });
+    const model = client.getGenerativeModel({ model: modelName });
 
     for (let attempt = 0; attempt <= maxAttemptsPerModel; attempt++) {
       try {
