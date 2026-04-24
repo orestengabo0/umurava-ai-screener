@@ -63,6 +63,14 @@ function ApplicantsContent() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
 
+  useEffect(() => {
+    if (!initialJobId) {
+      router.replace("/jobs");
+    } else {
+      setSelectedJobId(initialJobId);
+    }
+  }, [initialJobId, router]);
+
   const processFiles = (fileList: FileList | null) => {
     if (!fileList) return;
     Array.from(fileList).forEach((file) => {
@@ -143,16 +151,10 @@ function ApplicantsContent() {
   };
 
   useEffect(() => {
+    if (!initialJobId) return;
     setJobsLoading(true);
     getJobs({ status: "open" })
-      .then((res) => {
-        setJobs(res.jobs);
-        if (initialJobId) {
-          setSelectedJobId(initialJobId);
-        } else if (!selectedJobId && res.jobs.length > 0) {
-          setSelectedJobId(res.jobs[0]._id);
-        }
-      })
+      .then((res) => setJobs(res.jobs))
       .finally(() => setJobsLoading(false));
   }, [initialJobId]);
 
@@ -206,6 +208,10 @@ function ApplicantsContent() {
     setScreeningProgress("");
     setIsProcessing(false);
   };
+
+  if (!initialJobId) {
+    return null; // Return nothing while redirecting
+  }
 
   return (
     <div className="p-6 space-y-4 max-w-5xl">

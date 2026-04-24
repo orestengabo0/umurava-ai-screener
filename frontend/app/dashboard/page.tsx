@@ -14,19 +14,17 @@ import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import axios from "axios";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+import { getDashboardStats, type DashboardStats } from "@/lib/api/dashboard";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/dashboard/stats`);
-        setStats(res.data);
+        const data = await getDashboardStats();
+        setStats(data);
       } catch (err) {
         console.error("Dashboard stats failed", err);
       } finally {
@@ -50,7 +48,6 @@ export default function DashboardPage() {
     { title: "Total Jobs", value: stats?.totalJobs || 0, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50" },
     { title: "Open Jobs", value: stats?.openJobs || 0, icon: CheckCircle, color: "text-blue-600", bg: "bg-blue-50" },
     { title: "Total Applicants", value: stats?.totalApplicants || 0, icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-    { title: "Avg. Match Score", value: "78%", icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-50" },
   ];
 
   return (
@@ -83,7 +80,6 @@ export default function DashboardPage() {
           <Card className="lg:col-span-2 border shadow-sm rounded-md">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-0">
               <CardTitle className="text-base font-bold">Recent Ingestions</CardTitle>
-              <Button variant="ghost" size="sm" className="text-primary font-bold text-xs">View All</Button>
             </CardHeader>
             <CardContent className="p-4">
               <div className="space-y-2">
@@ -119,24 +115,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions / Stats */}
           <div className="space-y-4">
-            <Card className="border shadow-sm bg-primary text-primary-foreground overflow-hidden relative rounded-md">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <TrendingUp className="w-12 h-12 rotate-12" />
-              </div>
-              <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-base font-bold">AI Usage</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <p className="text-primary-foreground/80 mb-3 text-xs font-medium">You've saved roughly 12 hours this week.</p>
-                <div className="h-1 bg-white/20 rounded-md overflow-hidden">
-                  <div className="h-full bg-white w-3/4 rounded-md" />
-                </div>
-                <p className="mt-1.5 text-[9px] font-bold uppercase tracking-wider">75% of your quota used</p>
-              </CardContent>
-            </Card>
-
             <Card className="border shadow-sm rounded-md">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
