@@ -26,7 +26,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_BASE_URL = _RAW_BASE.endsWith("/api") ? _RAW_BASE.slice(0, -4) : _RAW_BASE;
 
 const recStyles: Record<string, string> = {
   "Highly Recommended": "bg-blue-600 text-white shadow-sm",
@@ -93,7 +94,7 @@ export default function JobResultsPage() {
     setChatLoading(true);
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/jobs/${jobId}/chat-results`, {
+      const res = await axios.post(`${API_BASE_URL}/api/jobs/${jobId}/chat-results`, {
         message: msg,
         context: applicants.map(a => ({
           name: `${a.firstName} ${a.lastName}`,
