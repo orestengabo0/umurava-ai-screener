@@ -5,8 +5,12 @@ import {
   ingestResumesProcess,
   ingestResumesParseWithGemini,
 } from "../controllers/resumeController.ts";
+import { authenticateToken } from "../middleware/auth.ts";
 
 const router = Router();
+
+// All resume routes require authentication
+router.use(authenticateToken);
 
 const storage = multer.memoryStorage();
 const upload = multer({

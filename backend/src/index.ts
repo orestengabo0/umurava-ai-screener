@@ -14,6 +14,7 @@ import jobRoutes from "./routes/jobRoutes.ts";
 import applicantRoutes from "./routes/applicantRoutes.ts";
 import resumeRoutes from "./routes/resumeRoutes.ts";
 import dashboardRoutes from "./routes/dashboardRoutes.ts";
+import authRoutes from "./routes/authRoutes.ts";
 import { openApiSpec } from "./swagger.ts";
 
 async function bootstrap() {
@@ -48,6 +49,10 @@ async function bootstrap() {
     }),
   );
 
+  // Auth routes (public + protected)
+  app.use("/api/auth", authRoutes);
+
+  // Protected routes
   app.use("/api/jobs", jobRoutes);
   app.use("/api/applicants", applicantRoutes);
   app.use("/api/dashboard", dashboardRoutes);

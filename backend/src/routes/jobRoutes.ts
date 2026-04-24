@@ -5,9 +5,14 @@ import {
   getJobById,
   setJobStatus,
   deleteJob,
+  updateJob,
 } from "../controllers/jobController.ts";
+import { authenticateToken } from "../middleware/auth.ts";
 
 const router = Router();
+
+// All job routes require authentication
+router.use(authenticateToken);
 
 // List all jobs (optionally filter by ?status=open|closed)
 router.get("/", getJobs);
@@ -23,5 +28,8 @@ router.patch("/:id/status", setJobStatus);
 
 // Delete a job
 router.delete("/:id", deleteJob);
+
+// Update a job
+router.put("/:id", updateJob);
 
 export default router;

@@ -8,8 +8,12 @@ import {
   chatWithApplicant,
   deleteJobApplicants,
 } from "../controllers/applicantController.ts";
+import { authenticateToken } from "../middleware/auth.ts";
 
 const router = Router();
+
+// All applicant routes require authentication
+router.use(authenticateToken);
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();

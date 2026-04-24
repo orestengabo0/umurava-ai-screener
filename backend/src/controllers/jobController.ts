@@ -137,6 +137,46 @@ export async function setJobStatus(
   }
 }
 
+// ─── PUT /api/jobs/:id ────────────────────────────────────────────────────────
+export async function updateJob(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { title, description, requiredSkills, experienceLevel, location } =
+      req.body as {
+        title?: string;
+        description?: string;
+        requiredSkills?: string[];
+        experienceLevel?: ExperienceLevel;
+        location?: string;
+      };
+
+    const updateData: Record<string, any> = {};
+    if (title) updateData.title = title;
+    if (description) updateData.description = description;
+    if (requiredSkills) updateData.requiredSkills = requiredSkills;
+    if (experienceLevel) updateData.experienceLevel = experienceLevel;
+    if (location !== undefined) updateData.location = location;
+
+    const job = await JobModel.findByIdAndUpdate(
+      req.params["id"],
+      updateData,
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!job) {
+      res.status(404).json({ message: "Job not found" });
+      return;
+    }
+
+    res.json(job);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── DELETE /api/jobs/:id ─────────────────────────────────────────────────────
 export async function deleteJob(
   req: Request,

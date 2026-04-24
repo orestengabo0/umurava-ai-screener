@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -28,6 +29,7 @@ export function AppSidebar({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   return (
     <aside
@@ -92,12 +94,21 @@ export function AppSidebar({
       {/* Footer */}
       <div className="p-3 border-t border-sidebar-border bg-accent/10">
         {!collapsed ? (
-          <Button variant="ghost" className="w-full justify-start gap-3 rounded-md py-2 h-9 hover:bg-destructive/10 hover:text-destructive group">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-3 rounded-md py-2 h-9 hover:bg-destructive/10 hover:text-destructive group"
+            onClick={logout}
+          >
             <LogOut className="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
             <span className="text-xs font-semibold">Sign Out</span>
           </Button>
         ) : (
-          <Button variant="ghost" size="icon" className="w-full h-9 rounded-md">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="w-full h-9 rounded-md hover:bg-destructive/10 hover:text-destructive"
+            onClick={logout}
+          >
             <LogOut className="w-4 h-4 text-muted-foreground" />
           </Button>
         )}
