@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { JobModel } from "../models/Job.ts";
-import type { ExperienceLevel } from "../models/Job.ts";
+import { JobModel } from "../models/Job.js";
+import type { ExperienceLevel } from "../models/Job.js";
 
 // ─── POST /api/jobs ───────────────────────────────────────────────────────────
 export async function createJob(

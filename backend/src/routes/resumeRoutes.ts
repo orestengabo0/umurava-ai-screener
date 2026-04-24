@@ -4,7 +4,7 @@ import {
   ingestResumesExtractText,
   ingestResumesProcess,
   ingestResumesParseWithGemini,
-} from "../controllers/resumeController.ts";
+} from "../controllers/resumeController.js";
 
 const router = Router();
 
@@ -43,8 +43,8 @@ router.post("/jobs/:jobId/chat-results", async (req: any, res: any) => {
   try {
     const { jobId } = req.params;
     const { message, context } = req.body;
-    const { getGeminiClient } = await import("../services/gemini.ts");
-    const { JobModel } = await import("../models/Job.ts");
+    const { getGeminiClient } = await import("../services/gemini.js");
+    const { JobModel } = await import("../models/Job.js");
 
     const job = await JobModel.findById(jobId).lean();
     

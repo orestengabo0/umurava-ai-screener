@@ -1,8 +1,8 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { Applicant } from "../models/Applicant.ts";
-import { ResumeFileModel } from "../models/ResumeFile.ts";
-import { deleteRawAsset } from "../services/cloudinary.ts";
+import { Applicant } from "../models/Applicant.js";
+import { ResumeFileModel } from "../models/ResumeFile.js";
+import { deleteRawAsset } from "../services/cloudinary.js";
 
 export const uploadApplicants = async (req: Request, res: Response) => {
   try {
@@ -165,7 +165,7 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
     const resumeFile = await ResumeFileModel.findOne({ applicantId: id }).lean();
     const resumeText = resumeFile?.extractedText || "";
 
-    const { JobModel } = await import("../models/Job.ts");
+    const { JobModel } = await import("../models/Job.js");
     const job = await JobModel.findById(applicant.jobId).lean();
 
     const context = `
@@ -190,7 +190,7 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
       - If you don't know, say so.
     `;
 
-    const model = (await import("../services/gemini.ts")).getGeminiClient().getGenerativeModel({ model: "gemini-flash-latest" });
+    const model = (await import("../services/gemini.js")).getGeminiClient().getGenerativeModel({ model: "gemini-flash-latest" });
     const result = await model.generateContent(context);
     const response = result.response.text();
 

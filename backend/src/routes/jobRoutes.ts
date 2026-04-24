@@ -5,7 +5,7 @@ import {
   getJobById,
   setJobStatus,
   deleteJob,
-} from "../controllers/jobController.ts";
+} from "../controllers/jobController.js";
 
 const router = Router();
 

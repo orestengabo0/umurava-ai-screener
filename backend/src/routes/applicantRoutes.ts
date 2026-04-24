@@ -7,7 +7,7 @@ import {
   deleteApplicant,
   chatWithApplicant,
   deleteJobApplicants,
-} from "../controllers/applicantController.ts";
+} from "../controllers/applicantController.js";
 
 const router = Router();
 

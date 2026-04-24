@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { JobModel } from "../models/Job.ts";
-import { Applicant } from "../models/Applicant.ts";
+import { JobModel } from "../models/Job.js";
+import { Applicant } from "../models/Applicant.js";
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
