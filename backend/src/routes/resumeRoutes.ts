@@ -48,7 +48,7 @@ router.post("/jobs/:jobId/chat-results", async (req: any, res: any) => {
 
     const job = await JobModel.findById(jobId).lean();
     
-    const model = getGeminiClient().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const model = getGeminiClient().getGenerativeModel({ model: "gemini-flash-latest" });
     const prompt = `You are a recruiter analyzing candidates for the following job:
     JOB TITLE: ${job?.title}
     JOB DESCRIPTION: ${job?.description}

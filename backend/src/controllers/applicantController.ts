@@ -190,7 +190,7 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
       - If you don't know, say so.
     `;
 
-    const model = (await import("../services/gemini.ts")).getGeminiClient().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const model = (await import("../services/gemini.ts")).getGeminiClient().getGenerativeModel({ model: "gemini-flash-latest" });
     const result = await model.generateContent(context);
     const response = result.response.text();
 
