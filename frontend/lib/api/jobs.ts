@@ -81,6 +81,15 @@ export async function createJob(payload: CreateJobPayload): Promise<Job> {
   return handle<Job>(res);
 }
 
+export async function updateJob(id: string, payload: Partial<CreateJobPayload>): Promise<Job> {
+  const res = await fetch(`${BASE}/api/jobs/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handle<Job>(res);
+}
+
 export async function setJobStatus(
   id: string,
   status: JobStatus

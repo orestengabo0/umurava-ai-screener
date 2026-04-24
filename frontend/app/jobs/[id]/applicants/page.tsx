@@ -81,10 +81,12 @@ export default function JobApplicantsPage() {
     }
   };
 
-  const filtered = applicants.filter(a => 
-    `${a.firstName} ${a.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-    a.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = [...applicants]
+    .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+    .filter(a => 
+      `${a.firstName} ${a.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
+      a.email.toLowerCase().includes(search.toLowerCase())
+    );
 
   return (
     <AppLayout>
