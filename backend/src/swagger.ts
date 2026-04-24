@@ -4,7 +4,10 @@ export const openApiSpec = {
     title: "Umurava AI Screener API",
     version: "1.0.0",
   },
-  servers: [{ url: "http://localhost:5000" }],
+  servers: [
+    { url: "http://localhost:5000", description: "Development" },
+    { url: "https://backend-ancient-silence-985.fly.dev", description: "Production" }
+  ],
   paths: {
     "/health": {
       get: {

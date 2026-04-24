@@ -167,7 +167,7 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
     const resumeFile = await ResumeFileModel.findOne({ applicantId: id }).lean();
     const resumeText = resumeFile?.extractedText || "";
 
-    const { JobModel } = await import("../models/Job.ts");
+    const { JobModel } = await import("../models/Job.js");
     const job = await JobModel.findById(applicant.jobId).lean();
 
     const context = `

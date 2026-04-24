@@ -1,12 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import pLimit from "p-limit";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { JobModel } from "../models/Job.ts";
-import { Applicant } from "../models/Applicant.ts";
-import { ResumeFileModel } from "../models/ResumeFile.ts";
-import { applicantParseSchema } from "../services/applicantParseSchema.ts";
-import { generateJsonFromResumeText } from "../services/gemini.ts";
-import { uploadPdfBuffer } from "../services/cloudinary.ts";
+import { JobModel } from "../models/Job.js";
+import { Applicant } from "../models/Applicant.js";
+import { ResumeFileModel } from "../models/ResumeFile.js";
+import { applicantParseSchema } from "../services/applicantParseSchema.js";
+import { generateJsonFromResumeText } from "../services/gemini.js";
+import { uploadPdfBuffer } from "../services/cloudinary.js";
 
 const MIN_EXTRACTED_TEXT_LENGTH = 300;
 const EXTRACT_CONCURRENCY = 4;

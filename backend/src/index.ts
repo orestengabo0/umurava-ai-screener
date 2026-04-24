@@ -26,9 +26,12 @@ async function bootstrap() {
 
   const app = express();
 
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
+  .split(",").map(origin => origin.trim());
+
   app.use(
     cors({
-      origin: "http://localhost:3000",
+      origin: allowedOrigins,
       credentials: true,
     }),
   );
