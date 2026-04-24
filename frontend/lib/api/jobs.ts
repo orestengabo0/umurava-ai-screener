@@ -1,6 +1,8 @@
 // lib/api/jobs.ts
 // Typed API client for the Job endpoints
 
+import { getToken } from "./auth";
+
 // Strip trailing /api if present — the functions below already append /api/...
 const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 const BASE = _RAW_BASE.endsWith("/api") ? _RAW_BASE.slice(0, -4) : _RAW_BASE;
@@ -29,6 +31,17 @@ export interface CreateJobPayload {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function getAuthHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -63,19 +76,25 @@ export async function getJobs(params?: {
   if (params?.page) url.searchParams.set("page", params.page.toString());
   if (params?.limit) url.searchParams.set("limit", params.limit.toString());
   
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await fetch(url.toString(), { 
+    cache: "no-store",
+    headers: getAuthHeaders(),
+  });
   return handle<GetJobsResponse>(res);
 }
 
 export async function getJob(id: string): Promise<Job> {
-  const res = await fetch(`${BASE}/api/jobs/${id}`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/api/jobs/${id}`, { 
+    cache: "no-store",
+    headers: getAuthHeaders(),
+  });
   return handle<Job>(res);
 }
 
 export async function createJob(payload: CreateJobPayload): Promise<Job> {
   const res = await fetch(`${BASE}/api/jobs`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handle<Job>(res);
@@ -84,7 +103,7 @@ export async function createJob(payload: CreateJobPayload): Promise<Job> {
 export async function updateJob(id: string, payload: Partial<CreateJobPayload>): Promise<Job> {
   const res = await fetch(`${BASE}/api/jobs/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handle<Job>(res);
@@ -96,13 +115,16 @@ export async function setJobStatus(
 ): Promise<Job> {
   const res = await fetch(`${BASE}/api/jobs/${id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
   return handle<Job>(res);
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/jobs/${id}`, { method: "DELETE" });
+  const res = await fetch(`${BASE}/api/jobs/${id}`, { 
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
   return handle<void>(res);
 }

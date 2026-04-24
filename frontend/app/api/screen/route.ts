@@ -1,7 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { getToken } from "@/lib/api/auth";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 function extractJson(raw: string): string {
   // Strip markdown fences
@@ -31,71 +31,40 @@ export async function POST(req: Request) {
       );
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      generationConfig: {
-        responseMimeType: "application/json",
+    const token = req.headers.get("authorization")?.replace("Bearer ", "");
+
+    const response = await fetch(`${API_BASE}/screen`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
+      body: JSON.stringify({ jobDetails, applicantsText }),
     });
 
-    const prompt = `You are a senior AI Recruitment Analyst. You must analyze the candidate data below and return a JSON screening result.
-
-CRITICAL: Your entire response must be a valid JSON array ONLY. No apologies, no explanations, no markdown. Just the JSON array.
-If you cannot find any candidates, return an empty array: []
-
-## Job Requirements
-${jobDetails}
-
-## Candidate Data (from uploaded files)
-${applicantsText}
-
-## Your Task
-1. Identify every distinct candidate in the data above
-2. Score each 0-100 based on match to job requirements:
-   - Skills match: 35%
-   - Experience relevance: 30%
-   - Education: 15%
-   - Projects/Achievements: 20%
-3. Sort by score descending
-
-## Required JSON Schema (return array of these objects)
-[
-  {
-    "id": 1,
-    "name": "Full Name (or 'Candidate 1' if unknown)",
-    "role": "their current or best-fit role title",
-    "score": 85,
-    "strengths": ["strength 1", "strength 2", "strength 3"],
-    "gaps": ["gap 1", "gap 2"],
-    "recommendation": "Highly Recommended",
-    "experience": "5 years",
-    "skills": ["Skill1", "Skill2", "Skill3"],
-    "aiSummary": "2-3 sentences explaining this candidate's ranking and hiring recommendation."
-  }
-]
-
-recommendation must be exactly one of: "Highly Recommended", "Recommended", "Consider", "Not Recommended"
-score >= 80 → Highly Recommended, 65-79 → Recommended, 50-64 → Consider, <50 → Not Recommended
-
-Return ONLY the JSON array. Nothing else.`;
-
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text();
-
-    console.log("[screen] raw Gemini response (first 500 chars):", raw.slice(0, 500));
-
-    const cleaned = extractJson(raw);
-    const parsed = JSON.parse(cleaned);
-
-    if (!Array.isArray(parsed)) {
-      throw new Error("AI returned a non-array response");
+    if (!response.ok) {
+      const error = await response.json();
+      
+      // Check for quota exceeded error
+      if (response.status === 429 || error.message?.toLowerCase().includes("quota") || error.message?.toLowerCase().includes("limit")) {
+        return NextResponse.json(
+          { 
+            error: "API quota exceeded",
+            quotaExceeded: true,
+            message: error.message || "You have reached your Gemini API quota limit. Please update your API key in Settings."
+          },
+          { status: 429 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: error.message || "Screening failed" },
+        { status: response.status }
+      );
     }
 
-    const sorted = parsed.sort(
-      (a: { score: number }, b: { score: number }) => b.score - a.score
-    );
-
-    return NextResponse.json(sorted);
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error) {
     console.error("[screen] error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";

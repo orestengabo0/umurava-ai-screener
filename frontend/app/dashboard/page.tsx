@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-  Briefcase, 
-  Users, 
-  CheckCircle, 
-  Clock, 
-  TrendingUp, 
-  ArrowUpRight,
+import { useRouter } from "next/navigation";
+import {
+  Briefcase,
+  Users,
+  CheckCircle,
+  Clock,
   Loader2
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -15,26 +14,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getDashboardStats, type DashboardStats } from "@/lib/api/dashboard";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await getDashboardStats();
-        setStats(data);
-      } catch (err) {
-        console.error("Dashboard stats failed", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
+    // Check authentication
+    if (!isAuthenticated && !authLoading) {
+      router.push("/");
+      return;
+    }
 
-  if (loading) {
+    if (isAuthenticated) {
+      const fetchStats = async () => {
+        try {
+          const data = await getDashboardStats();
+          setStats(data);
+        } catch (err) {
+          console.error("Dashboard stats failed", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchStats();
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  if (authLoading || loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center min-h-[60vh]">

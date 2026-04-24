@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getToken } from "./auth";
 
 const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 const API_BASE_URL = _RAW_BASE.endsWith("/api") ? _RAW_BASE : `${_RAW_BASE}/api`;
@@ -8,6 +9,15 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+// Add request interceptor to include JWT token
+apiClient.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export interface UploadResponse {

@@ -8,33 +8,45 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  LogOut
+  LogOut,
+  Settings
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Jobs", url: "/jobs", icon: Briefcase },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar({ 
   mobileOpen, 
-  setMobileOpen 
+  setMobileOpen,
+  onCollapsedChange
 }: { 
   mobileOpen: boolean; 
   setMobileOpen: (open: boolean) => void;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { logout } = useAuth();
+
+  const handleCollapseToggle = () => {
+    const newCollapsed = !collapsed;
+    setCollapsed(newCollapsed);
+    onCollapsedChange?.(newCollapsed);
+  };
 
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 lg:relative lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300",
         collapsed ? "w-[80px]" : "w-[280px]",
-        mobileOpen ? "translate-x-0" : "-translate-x-full"
+        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
       {/* Header / Logo */}
@@ -46,7 +58,7 @@ export function AppSidebar({
 
           {!collapsed && (
             <span className="font-black text-base text-foreground tracking-tighter">
-              UMURAVA<span className="text-primary">.</span>
+              UMURAVA
             </span>
           )}
         </div>
@@ -92,12 +104,21 @@ export function AppSidebar({
       {/* Footer */}
       <div className="p-3 border-t border-sidebar-border bg-accent/10">
         {!collapsed ? (
-          <Button variant="ghost" className="w-full justify-start gap-3 rounded-md py-2 h-9 hover:bg-destructive/10 hover:text-destructive group">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-3 rounded-md py-2 h-9 hover:bg-destructive/10 hover:text-destructive group"
+            onClick={logout}
+          >
             <LogOut className="w-4 h-4 text-muted-foreground group-hover:text-destructive" />
             <span className="text-xs font-semibold">Sign Out</span>
           </Button>
         ) : (
-          <Button variant="ghost" size="icon" className="w-full h-9 rounded-md">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="w-full h-9 rounded-md hover:bg-destructive/10 hover:text-destructive"
+            onClick={logout}
+          >
             <LogOut className="w-4 h-4 text-muted-foreground" />
           </Button>
         )}
@@ -105,7 +126,7 @@ export function AppSidebar({
 
       {/* Collapse toggle (Desktop only) */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={handleCollapseToggle}
         className="hidden lg:flex absolute -right-3 top-16 w-6 h-6 rounded-md bg-card border shadow-sm items-center justify-center text-muted-foreground hover:text-primary transition-colors z-50"
       >
         {collapsed ? (

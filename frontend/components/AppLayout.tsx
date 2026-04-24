@@ -7,11 +7,16 @@ import { cn } from "@/lib/utils";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Sidebar - Persistent on desktop, drawer on mobile */}
-      <AppSidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      {/* Sidebar - Fixed on desktop, drawer on mobile */}
+      <AppSidebar 
+        mobileOpen={mobileOpen} 
+        setMobileOpen={setMobileOpen}
+        onCollapsedChange={setSidebarCollapsed}
+      />
       
       {/* Backdrop for mobile */}
       {mobileOpen && (
@@ -21,7 +26,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={cn(
+        "flex-1 flex flex-col min-w-0 transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-[80px]" : "lg:ml-[280px]"
+      )}>
         <TopNavbar onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-x-hidden">
           {children}

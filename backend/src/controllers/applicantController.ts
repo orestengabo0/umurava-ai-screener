@@ -1,8 +1,9 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { Applicant } from "../models/Applicant.js";
-import { ResumeFileModel } from "../models/ResumeFile.js";
-import { deleteRawAsset } from "../services/cloudinary.js";
+import { Applicant } from "../models/Applicant.ts";
+import { ResumeFileModel } from "../models/ResumeFile.ts";
+import { deleteRawAsset } from "../services/cloudinary.ts";
+import { getGeminiClientForUser } from "../services/gemini.ts";
 
 export const uploadApplicants = async (req: Request, res: Response) => {
   try {
@@ -152,6 +153,7 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { message, history } = req.body;
+    const userId = (req as any).user?.userId;
 
     if (!id || !message) {
       return res.status(400).json({ message: "Applicant ID and message are required" });
@@ -190,13 +192,14 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
       - If you don't know, say so.
     `;
 
-    const model = (await import("../services/gemini.js")).getGeminiClient().getGenerativeModel({ model: "gemini-flash-latest" });
-    const result = await model.generateContent(context);
+    const { client, model } = await getGeminiClientForUser(userId || "");
+    const generativeModel = client.getGenerativeModel({ model });
+    const result = await generativeModel.generateContent(context);
     const response = result.response.text();
 
     res.status(200).json({ response });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Chat failed";
+    const message = error instanceof Error ? error.message : "chat failed. Please check if your gemini key is valid and not expired";
     res.status(500).json({ message });
   }
 };
