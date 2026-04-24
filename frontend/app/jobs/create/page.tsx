@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AppLayout } from "@/components/AppLayout";
 import { createJob, type ExperienceLevel } from "@/lib/api/jobs";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DEFAULT_SKILLS = [
   "React", "TypeScript", "Python", "Node.js", "AWS", "Docker", "SQL", "GraphQL", "Figma", "Java", "Go"
@@ -64,27 +65,49 @@ export default function CreateJobPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 space-y-4 max-w-4xl">
+      <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden bg-background">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="rounded-md h-8 w-8 hover:bg-accent"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight">Post New Job</h1>
-            <p className="text-muted-foreground mt-0.5 text-[10px] font-bold uppercase tracking-wider">
-              Find the perfect talent for your team.
-            </p>
+        <div className="px-4 py-2.5 border-b bg-card flex items-center justify-between shadow-sm z-10 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.back()}
+              className="p-1.5 rounded-md h-8 w-8 hover:bg-accent flex-shrink-0"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </Button>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold leading-none flex items-center gap-2 truncate">Post New Job</h1>
+              <p className="text-[9px] text-muted-foreground mt-0.5 font-bold uppercase tracking-wider truncate">
+                Find the perfect talent for your team.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              variant="ghost"
+              className="rounded-md px-3 h-8 text-[10px] font-bold hidden sm:flex"
+              onClick={() => router.back()}
+              disabled={loading}
+            >
+              Discard
+            </Button>
+            <Button
+              className="rounded-md px-4 h-8 font-bold gap-1.5 text-[10px]"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+              {loading ? "Publishing..." : "Publish Job"}
+            </Button>
           </div>
         </div>
 
-        {/* Main Form */}
-        <div className="space-y-4">
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="space-y-4 pb-24">
           <div className="bg-card border rounded-md p-5 shadow-sm space-y-4">
             {/* Title */}
             <div className="space-y-1.5">
@@ -155,18 +178,18 @@ export default function CreateJobPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Experience</label>
-                <select
-                  value={experienceLevel}
-                  onChange={(e) => setExperienceLevel(e.target.value as ExperienceLevel | "")}
-                  className="w-full px-3 h-10 rounded-md border bg-accent/5 appearance-none focus:bg-background transition-all outline-none font-semibold cursor-pointer text-xs"
-                >
-                  <option value="">Select Level</option>
-                  <option value="entry">Entry Level</option>
-                  <option value="mid">Mid Level</option>
-                  <option value="senior">Senior Level</option>
-                  <option value="lead">Lead / Staff</option>
-                  <option value="executive">Executive</option>
-                </select>
+                <Select value={experienceLevel} onValueChange={(val: any) => setExperienceLevel(val)}>
+                  <SelectTrigger className="w-full px-3 h-10 rounded-md border bg-accent/5 transition-all font-semibold text-xs text-foreground">
+                    <SelectValue placeholder="Select Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entry">Entry Level</SelectItem>
+                    <SelectItem value="mid">Mid Level</SelectItem>
+                    <SelectItem value="senior">Senior Level</SelectItem>
+                    <SelectItem value="lead">Lead / Staff</SelectItem>
+                    <SelectItem value="executive">Executive</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
@@ -182,24 +205,6 @@ export default function CreateJobPage() {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-2 py-2">
-            <Button
-              variant="ghost"
-              className="rounded-md px-4 h-9 text-xs font-bold"
-              onClick={() => router.back()}
-              disabled={loading}
-            >
-              Discard
-            </Button>
-            <Button
-              className="rounded-md px-6 h-9 font-bold gap-2 text-xs"
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              {loading ? "Publishing..." : "Publish Job"}
-            </Button>
           </div>
         </div>
       </div>

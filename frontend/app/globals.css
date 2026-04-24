@@ -1,53 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap');
-
 @import "tailwindcss";
 
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(222 47% 11%);
+  --color-background: #ffffff;
+  --color-foreground: #041738;
 
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(222 47% 11%);
+  --color-card: #ffffff;
+  --color-card-foreground: #041738;
 
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(222 47% 11%);
+  --color-popover: #ffffff;
+  --color-popover-foreground: #041738;
 
-  --color-primary: hsl(221 90% 56%);
-  --color-primary-foreground: hsl(0 0% 100%);
+  --color-primary: #2b71f0;
+  --color-primary-foreground: #ffffff;
 
-  --color-secondary: hsl(222 47% 18%);
-  --color-secondary-foreground: hsl(0 0% 100%);
+  --color-secondary: #f1f1f1;
+  --color-secondary-foreground: #041738;
 
-  --color-muted: hsl(210 20% 96%);
-  --color-muted-foreground: hsl(215 16% 47%);
+  --color-muted: #f1f1f1;
+  --color-muted-foreground: #687588;
 
-  --color-accent: hsl(221 90% 96%);
-  --color-accent-foreground: hsl(221 90% 45%);
+  --color-accent: #ede9fe;
+  --color-accent-foreground: #6d28d9;
 
-  --color-destructive: hsl(0 84% 60%);
-  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-destructive: #047857; /* We'll use this for success-like or danger */
+  --color-destructive-foreground: #ffffff;
 
-  --color-border: hsl(214 20% 92%);
-  --color-input: hsl(214 20% 92%);
-  --color-ring: hsl(221 90% 56%);
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #2b71f0;
 
-  --color-success: hsl(152 60% 42%);
-  --color-success-foreground: hsl(0 0% 100%);
-  --color-warning: hsl(38 92% 50%);
-  --color-warning-foreground: hsl(0 0% 100%);
+  --color-success: #15803d;
+  --color-success-foreground: #ffffff;
+  --color-warning: #fde047;
+  --color-warning-foreground: #854d0e;
 
-  --color-sidebar: hsl(0 0% 100%);
-  --color-sidebar-foreground: hsl(222 47% 11%);
-  --color-sidebar-primary: hsl(221 90% 56%);
-  --color-sidebar-primary-foreground: hsl(0 0% 100%);
-  --color-sidebar-accent: hsl(221 90% 96%);
-  --color-sidebar-accent-foreground: hsl(221 90% 45%);
-  --color-sidebar-border: hsl(214 20% 93%);
-  --color-sidebar-ring: hsl(221 90% 56%);
-  --color-sidebar-muted: hsl(215 16% 47%);
+  --color-sidebar: #ffffff;
+  --color-sidebar-foreground: #041738;
+  --color-sidebar-primary: #2b71f0;
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: #ede9fe;
+  --color-sidebar-accent-foreground: #6d28d9;
+  --color-sidebar-border: #e5e5e5;
+  --color-sidebar-ring: #2b71f0;
+  --color-sidebar-muted: #687588;
 
-  --radius: 0.5rem;
-  --font-sans: "DM Sans", sans-serif;
+  --radius: 0.375rem;
+  --font-sans: var(--font-work-sans), sans-serif;
 }
 
 @layer base {

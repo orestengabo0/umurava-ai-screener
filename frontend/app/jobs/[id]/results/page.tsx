@@ -1,21 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { MarkdownMessage } from "@/components/MarkdownMessage";
 import { 
   ArrowLeft, 
   Loader2, 
   Brain, 
-  TrendingUp, 
+  Send,
   MessageSquare,
   ChevronDown,
   ChevronUp,
   CheckCircle,
   AlertTriangle,
-  Star,
   ExternalLink,
-  Target,
-  Users
+  Target
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -52,6 +51,19 @@ export default function JobResultsPage() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading]);
+
+  useEffect(() => {
+    const el = chatTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [chatInput]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -72,10 +84,11 @@ export default function JobResultsPage() {
     fetchData();
   }, [jobId]);
 
-  const handleChat = async () => {
+  const handleChat = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
     const msg = chatInput.trim();
     setChatInput("");
+    if (chatTextareaRef.current) chatTextareaRef.current.style.height = "auto";
     setChatMessages(prev => [...prev, { role: "user", content: msg }]);
     setChatLoading(true);
 
@@ -97,7 +110,7 @@ export default function JobResultsPage() {
     } finally {
       setChatLoading(false);
     }
-  };
+  }, [chatInput, chatLoading, jobId, applicants]);
 
   if (loading) {
     return (
@@ -249,38 +262,62 @@ export default function JobResultsPage() {
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-accent/5">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-accent/5">
             {chatMessages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={cn(
-                  "max-w-[90%] rounded-md px-3 py-2 text-[11px] font-medium shadow-sm leading-relaxed",
+                  "max-w-[88%] rounded-md px-3 py-2 text-[11px] leading-relaxed",
                   m.role === "user" 
                     ? "bg-primary text-primary-foreground" 
                     : "bg-white border text-foreground"
                 )}>
-                  {m.content}
+                  <MarkdownMessage content={m.content} isUser={m.role === "user"} />
                 </div>
               </div>
             ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white border rounded-md px-3 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:300ms]" />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatBottomRef} />
           </div>
 
-          <div className="p-3 border-t bg-white">
-            <div className="flex gap-1.5">
-              <input 
+          <div className="p-3 border-t bg-card">
+            <div className="flex items-end gap-2 bg-accent/20 border rounded-md px-3 py-2 focus-within:ring-1 focus-within:ring-primary/30 transition-all">
+              <textarea
+                ref={chatTextareaRef}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleChat()}
-                placeholder="Ask AI..."
-                className="flex-1 px-3 h-9 rounded-md border bg-accent/20 text-[11px] font-bold outline-none"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleChat();
+                  }
+                }}
+                placeholder="Ask AI... (Enter to send)"
+                rows={1}
+                className="flex-1 bg-transparent resize-none text-[11px] font-medium outline-none placeholder:text-muted-foreground/60 max-h-[120px] leading-relaxed"
               />
-              <Button 
+              <button
                 onClick={handleChat}
-                disabled={chatLoading}
-                className="w-9 h-9 rounded-md p-0"
+                disabled={!chatInput.trim() || chatLoading}
+                className="flex-shrink-0 p-1.5 rounded-md bg-primary text-primary-foreground disabled:opacity-30 hover:opacity-90 transition-opacity mb-0.5"
               >
-                <TrendingUp className="w-3.5 h-3.5" />
-              </Button>
+                {chatLoading
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <Send className="w-3 h-3" />}
+              </button>
             </div>
+            <p className="text-[8px] text-muted-foreground/40 mt-1 text-right font-medium uppercase tracking-wider">
+              Enter ↵ send · Shift+Enter newline
+            </p>
           </div>
         </div>
       </div>
