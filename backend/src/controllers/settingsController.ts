@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 
 const updateSettingsSchema = z.object({
-  geminiApiKey: z.string().min(1, "API key is required"),
+  geminiApiKey: z.string().optional(),
   geminiModel: z.string().min(1, "Model is required").default("gemini-2.5-flash-lite"),
 });
 
@@ -75,18 +75,35 @@ export async function updateSettingsHandler(
 
     const { geminiApiKey, geminiModel } = validationResult.data;
 
-    // Reject masked keys (containing bullet points)
-    if (geminiApiKey.includes("•")) {
-      res.status(400).json({ 
-        message: "Cannot save masked API key. Please enter the full API key." 
-      });
-      return;
+    // If API key is provided, validate it's not masked
+    if (geminiApiKey) {
+      // Reject masked keys (containing bullet points)
+      if (geminiApiKey.includes("•")) {
+        res.status(400).json({ 
+          message: "Cannot save masked API key. Please enter the full API key." 
+        });
+        return;
+      }
+    }
+
+    // If only model is being updated, get existing API key
+    let finalApiKey = geminiApiKey;
+    if (!finalApiKey) {
+      const existingSettings = await SettingsModel.findOne({ userId });
+      if (existingSettings && existingSettings.geminiApiKey) {
+        finalApiKey = existingSettings.geminiApiKey;
+      } else {
+        res.status(400).json({ 
+          message: "API key is required when no existing key found." 
+        });
+        return;
+      }
     }
 
     const settings = await SettingsModel.findOneAndUpdate(
       { userId },
       {
-        geminiApiKey,
+        geminiApiKey: finalApiKey,
         geminiModel,
         isActive: true,
         lastTestedAt: undefined,

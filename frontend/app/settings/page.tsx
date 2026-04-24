@@ -28,6 +28,7 @@ export default function SettingsPage() {
     geminiApiKey: "",
     geminiModel: "gemini-2.5-flash-lite",
   });
+  const [hasModelChanged, setHasModelChanged] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -38,9 +39,10 @@ export default function SettingsPage() {
       const data = await getSettings();
       setSettings(data);
       setFormData({
-        geminiApiKey: "", // Don't populate with masked key from backend
+        geminiApiKey: "", 
         geminiModel: data.geminiModel,
       });
+      setHasModelChanged(false);
     } catch (error) {
       toast.error("Failed to load settings", {
         description: error instanceof Error ? error.message : "Please try again",
@@ -53,12 +55,18 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const data = await updateSettings(formData);
+      // Only send API key if it's a new one (not empty and not masked)
+      const dataToSend = formData.geminiApiKey && !formData.geminiApiKey.includes("•")
+        ? formData 
+        : { geminiModel: formData.geminiModel };
+      
+      const data = await updateSettings(dataToSend);
       setSettings(data);
       setFormData({
         geminiApiKey: "", // Clear the input after saving
         geminiModel: data.geminiModel,
       });
+      setHasModelChanged(false);
       toast.success("Settings saved", {
         description: "Your Gemini API configuration has been updated.",
       });
@@ -194,7 +202,10 @@ export default function SettingsPage() {
               </label>
               <Select
                 value={formData.geminiModel}
-                onValueChange={(value) => setFormData({ ...formData, geminiModel: value })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, geminiModel: value });
+                  setHasModelChanged(value !== settings.geminiModel);
+                }}
               >
                 <SelectTrigger id="model">
                   <SelectValue placeholder="Select a model" />
@@ -235,7 +246,7 @@ export default function SettingsPage() {
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={handleSave}
-                disabled={isSaving || !formData.geminiApiKey}
+                disabled={isSaving || (!formData.geminiApiKey && !hasModelChanged)}
                 className="flex-1"
               >
                 {isSaving ? (

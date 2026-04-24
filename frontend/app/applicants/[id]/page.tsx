@@ -247,7 +247,7 @@ export default function ApplicantDetailPage() {
         {/* Backdrop */}
         {chatOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/40 backdrop-blur-[2px]"
+            className="fixed inset-0 z-30 bg-black/40 "
             onClick={() => setChatOpen(false)}
           />
         )}

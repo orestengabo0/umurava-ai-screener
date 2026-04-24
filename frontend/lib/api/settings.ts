@@ -11,7 +11,7 @@ export interface Settings {
 }
 
 export interface UpdateSettingsData {
-  geminiApiKey: string;
+  geminiApiKey?: string;
   geminiModel: string;
 }
 

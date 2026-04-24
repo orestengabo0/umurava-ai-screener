@@ -10,17 +10,28 @@ import {
   Loader2,
   Target,
   FileSearch,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { extractFileText } from "@/lib/file-parsers";
+import { extractFileText, extractCandidateData, type CandidateData } from "@/lib/file-parsers";
 import { AppLayout } from "@/components/AppLayout";
 import { getJobs, type Job } from "@/lib/api/jobs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getToken } from "@/lib/api/auth";
 
 interface UploadedFile {
@@ -33,6 +44,13 @@ interface UploadedFile {
   errorMsg?: string;
   rawFile: File;
   extractedText?: string;
+  candidateData?: CandidateData[];
+  processingResults?: {
+    downloaded: string[];
+    downloadFailed: Array<{ email: string; error: string }>;
+    processed: Array<{ ok: boolean; candidate: string; applicantId?: string }>;
+    processFailed: Array<{ ok: boolean; candidate: string; error: string }>;
+  };
 }
 
 const ACCEPTED_TYPES: Record<string, "pdf" | "csv" | "xlsx"> = {
@@ -48,7 +66,7 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-function ApplicantsContent() {
+function ApplicantsContent({ setQuotaErrorDialogOpen }: { setQuotaErrorDialogOpen: (open: boolean) => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialJobId = searchParams.get("jobId");
@@ -59,6 +77,7 @@ function ApplicantsContent() {
   const [screeningProgress, setScreeningProgress] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressPercentage, setProgressPercentage] = useState(0);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
@@ -102,46 +121,85 @@ function ApplicantsContent() {
       };
       setFiles((prev) => [...prev, entry]);
 
-      extractFileText(file, type)
-        .then((text) => {
-          if (!text || text.trim().length < 10) {
+      if (type === "csv" || type === "xlsx") {
+        // Extract candidate data from CSV/XLSX
+        extractCandidateData(file, type)
+          .then((data) => {
+            console.log(`[Frontend] Extracted ${data.length} candidates from ${file.name}:`, data);
+            
+            if (!data || data.length === 0) {
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === id
+                    ? {
+                        ...f,
+                        status: "error" as const,
+                        errorMsg: "No valid candidate data found. Required columns: firstname, lastname, email, resumeLink",
+                      }
+                    : f
+                )
+              );
+            } else {
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === id
+                    ? {
+                        ...f,
+                        status: "valid" as const,
+                        rows: data.length,
+                        candidateData: data,
+                        extractedText: JSON.stringify(data),
+                      }
+                    : f
+                )
+              );
+            }
+          })
+          .catch(() => {
             setFiles((prev) =>
               prev.map((f) =>
-                f.id === id
-                  ? {
-                      ...f,
-                      status: "error" as const,
-                      errorMsg:
-                        type === "pdf"
-                          ? "Scanned PDF detected. Text extraction failed."
-                          : "File appears empty.",
-                    }
-                  : f
+                f.id === id ? { ...f, status: "error", errorMsg: "Failed to parse candidate data" } : f
               )
             );
-          } else {
-            const candidateCount = text.split("\n").filter((l) => l.trim()).length;
+          });
+      } else {
+        // Extract text from PDF
+        extractFileText(file, type)
+          .then((text) => {
+            if (!text || text.trim().length < 10) {
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === id
+                    ? {
+                        ...f,
+                        status: "error" as const,
+                        errorMsg: "Scanned PDF detected. Text extraction failed.",
+                      }
+                    : f
+                )
+              );
+            } else {
+              setFiles((prev) =>
+                prev.map((f) =>
+                  f.id === id
+                    ? {
+                        ...f,
+                        status: "valid" as const,
+                        extractedText: text,
+                      }
+                    : f
+                )
+              );
+            }
+          })
+          .catch(() => {
             setFiles((prev) =>
               prev.map((f) =>
-                f.id === id
-                  ? {
-                      ...f,
-                      status: "valid" as const,
-                      extractedText: text,
-                      rows: type !== "pdf" ? candidateCount : undefined,
-                    }
-                  : f
+                f.id === id ? { ...f, status: "error", errorMsg: "Read failure." } : f
               )
             );
-          }
-        })
-        .catch(() => {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === id ? { ...f, status: "error", errorMsg: "Read failure." } : f
-            )
-          );
-        });
+          });
+      }
     });
   };
 
@@ -165,6 +223,18 @@ function ApplicantsContent() {
     router.push(`/jobs/${selectedJobId}/results`);
   };
 
+  const toggleFileExpansion = (fileId: string) => {
+    setExpandedFiles(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
   const handleProcessToJob = async () => {
     const validFiles = files.filter(f => f.status === "valid");
     if (validFiles.length === 0 || !selectedJobId) return;
@@ -179,8 +249,93 @@ function ApplicantsContent() {
     const baseRaw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
     const base = baseRaw.endsWith("/api") ? baseRaw.slice(0, -4) : baseRaw;
 
+    // Separate CSV/XLSX files from PDF files
+    const csvXlsxFiles = validFiles.filter(f => f.type === "csv" || f.type === "xlsx");
+    const pdfFiles = validFiles.filter(f => f.type === "pdf");
+
     let processedCount = 0;
-    for (const f of validFiles) {
+    const totalFiles = validFiles.length;
+
+    // Process CSV/XLSX files with candidate data
+    for (const f of csvXlsxFiles) {
+      setScreeningProgress(`Processing ${f.name}...`);
+      try {
+        const token = getToken();
+        
+        console.log(`[Frontend] Sending ${f.candidateData?.length} candidates from ${f.name} to backend`);
+        console.log(`[Frontend] Candidates:`, f.candidateData);
+        
+        const res = await fetch(`${base}/api/jobs/${selectedJobId}/resumes/process-csv`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            candidates: f.candidateData,
+          }),
+        });
+        const data = await res.json();
+        
+        console.log(`[Frontend] Backend response for ${f.name}:`, data);
+        
+        // Check for quota exceeded error in backend response
+        if (data.message && (data.message.includes('429') || data.message.includes('quota') || data.message.includes('Too Many Requests'))) {
+          setQuotaErrorDialogOpen(true);
+        }
+        
+        // Check for quota errors in processing results
+        if (data.results?.processFailed) {
+          const hasQuotaError = data.results.processFailed.some((r: any) => 
+            r.error && (r.error.includes('429') || r.error.includes('quota') || r.error.includes('Too Many Requests'))
+          );
+          if (hasQuotaError) {
+            setQuotaErrorDialogOpen(true);
+          }
+        }
+        
+        setFiles((prev) =>
+          prev.map((file) => {
+            if (file.id !== f.id) return file;
+            if (data.success) {
+              return { 
+                ...file, 
+                status: "processed" as const,
+                processingResults: data.results,
+              };
+            }
+            return { 
+              ...file, 
+              status: "error" as const, 
+              errorMsg: data.message || "Failed",
+              processingResults: data.results,
+            };
+          })
+        );
+      } catch (e) {
+        const error = e instanceof Error ? e.message : 'Upload failed';
+        
+        console.error(`[Frontend] Error processing ${f.name}:`, error);
+        
+        // Check for quota exceeded error
+        if (error.includes('429') || error.includes('quota') || error.includes('Too Many Requests')) {
+          setQuotaErrorDialogOpen(true);
+        } else {
+          toast.error("Processing failed", {
+            description: error,
+          });
+        }
+        
+        setFiles((prev) =>
+          prev.map((file) => (file.id === f.id ? { ...file, status: "error", errorMsg: "Upload failed" } : file))
+        );
+      }
+      processedCount++;
+      setProgressPercentage(Math.round((processedCount / totalFiles) * 100));
+    }
+
+    // Process PDF files
+    for (const f of pdfFiles) {
       setScreeningProgress(`Analyzing ${f.name}...`);
       try {
         const form = new FormData();
@@ -195,20 +350,94 @@ function ApplicantsContent() {
         });
         const data = await res.json();
         
+        // Check for quota exceeded error in backend response
+        if (data.message && (data.message.includes('429') || data.message.includes('quota') || data.message.includes('Too Many Requests'))) {
+          setQuotaErrorDialogOpen(true);
+        }
+        
+        // Check for quota errors in processing results (for PDF endpoint)
+        if (data.results && Array.isArray(data.results)) {
+          const hasQuotaError = data.results.some((r: any) => 
+            r.reason && (r.reason.includes('429') || r.reason.includes('quota') || r.reason.includes('Too Many Requests'))
+          );
+          if (hasQuotaError) {
+            setQuotaErrorDialogOpen(true);
+          }
+        }
+        
+        // Check for quota errors in processing results (for CSV endpoint)
+        if (data.results) {
+          const allErrors = [...(data.results.processFailed || []), ...(data.results.downloadFailed || [])];
+          const hasQuotaError = allErrors.some((r: any) => 
+            r.error && (r.error.includes('429') || r.error.includes('quota') || r.error.includes('Too Many Requests'))
+          );
+          if (hasQuotaError) {
+            setQuotaErrorDialogOpen(true);
+          }
+        }
+        
         setFiles((prev) =>
           prev.map((file) => {
             if (file.id !== f.id) return file;
-            if (data?.results?.[0]?.ok) return { ...file, status: "processed" as const };
-            return { ...file, status: "error" as const, errorMsg: data?.results?.[0]?.reason || "Failed" };
+            if (data?.results?.[0]?.ok) {
+              return { 
+                ...file, 
+                status: "processed" as const,
+                processingResults: {
+                  downloaded: [],
+                  downloadFailed: [],
+                  processed: [{ ok: true, candidate: file.name }],
+                  processFailed: [],
+                },
+              };
+            }
+            return { 
+              ...file, 
+              status: "error" as const, 
+              errorMsg: data?.results?.[0]?.reason || "Failed",
+              processingResults: {
+                downloaded: [],
+                downloadFailed: [],
+                processed: [],
+                processFailed: [{ ok: false, candidate: file.name, error: data?.results?.[0]?.reason || "Failed" }],
+              },
+            };
           })
         );
       } catch (e) {
+        const error = e instanceof Error ? e.message : 'Upload failed';
+        
+        // Check for quota exceeded error
+        if (error.includes('429') || error.includes('quota') || error.includes('Too Many Requests')) {
+          toast.error("API quota exceeded", {
+            description: "Your Gemini API quota has been reached. Please go to Settings and update your API key or switch to a different model.",
+            action: {
+              label: "Go to Settings",
+              onClick: () => router.push('/settings'),
+            },
+          });
+        } else {
+          toast.error("Upload failed", {
+            description: error,
+          });
+        }
+        
         setFiles((prev) =>
-          prev.map((file) => (file.id === f.id ? { ...file, status: "error", errorMsg: "Upload failed" } : file))
+          prev.map((file) => (file.id === f.id ? { 
+            ...file, 
+            status: "error", 
+            errorMsg: "Upload failed",
+            processingResults: {
+              downloaded: [],
+              downloadFailed: [],
+              processed: [],
+              processFailed: [{ ok: false, candidate: file.name, error: error }],
+            },
+          } : file))
         );
       }
       processedCount++;
-      setProgressPercentage(Math.round((processedCount / validFiles.length) * 100));
+      setProgressPercentage(Math.round((processedCount / totalFiles) * 100));
     }
     setScreeningProgress("");
     setIsProcessing(false);
@@ -219,6 +448,7 @@ function ApplicantsContent() {
   }
 
   return (
+    <Suspense>
     <div className="p-6 space-y-4 max-w-5xl">
       <div>
         <h1 className="text-xl font-bold text-foreground tracking-tight">Talent Ingestion</h1>
@@ -242,12 +472,38 @@ function ApplicantsContent() {
         <div className="w-12 h-12 rounded-md bg-accent flex items-center justify-center mx-auto mb-3 transition-transform">
           <Upload className="w-6 h-6 text-primary" />
         </div>
-        <h3 className="text-sm font-bold text-foreground tracking-tight uppercase tracking-wider">Inhale Resumes</h3>
+        <h3 className="text-sm font-bold text-foreground tracking-tight uppercase tracking-wider">Upload Resumes</h3>
         <p className="text-muted-foreground mt-1 text-[10px] font-bold uppercase tracking-widest opacity-60">PDF, CSV or XLSX (Max 25MB)</p>
         <div className="mt-4 flex justify-center gap-1.5">
           {["PDF", "CSV", "XLSX"].map(t => (
             <Badge key={t} variant="outline" className="bg-white/50 px-1.5 py-0 rounded-sm font-bold border-accent/40 text-muted-foreground text-[8px]">{t}</Badge>
           ))}
+        </div>
+      </div>
+
+      {/* CSV/XLSX Format Requirements */}
+      <div className="bg-blue-50/50 border border-blue-200 rounded-md p-4">
+        <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-2">
+          <Info className="w-3.5 h-3.5" />
+          CSV/XLSX Required Columns
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="bg-white rounded px-2 py-1.5 border border-blue-100">
+            <p className="text-[9px] font-bold text-foreground">firstname</p>
+            <p className="text-[8px] text-muted-foreground">Required</p>
+          </div>
+          <div className="bg-white rounded px-2 py-1.5 border border-blue-100">
+            <p className="text-[9px] font-bold text-foreground">lastname</p>
+            <p className="text-[8px] text-muted-foreground">Required</p>
+          </div>
+          <div className="bg-white rounded px-2 py-1.5 border border-blue-100">
+            <p className="text-[9px] font-bold text-foreground">email</p>
+            <p className="text-[8px] text-muted-foreground">Required</p>
+          </div>
+          <div className="bg-white rounded px-2 py-1.5 border border-blue-100">
+            <p className="text-[9px] font-bold text-foreground">resumeLink</p>
+            <p className="text-[8px] text-muted-foreground">Required</p>
+          </div>
         </div>
       </div>
 
@@ -262,28 +518,101 @@ function ApplicantsContent() {
           </div>
           <div className="divide-y max-h-[240px] overflow-y-auto">
             {files.map((file) => (
-              <div key={file.id} className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-8 h-8 rounded-md flex items-center justify-center border",
-                    file.type === "pdf" ? "bg-red-50/50 border-red-100 text-red-500" : "bg-blue-50/50 border-blue-100 text-blue-500"
-                  )}>
-                    {file.type === "pdf" ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
-                  </div>
-                  <div>
-                    <p className="font-bold text-foreground text-[11px] truncate max-w-[200px]">{file.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase">{file.size}</span>
-                      {file.status === "validating" && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
-                      {file.status === "valid" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Ready</Badge>}
-                      {file.status === "processed" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
-                      {file.status === "error" && <Badge variant="destructive" className="text-[7px] font-bold uppercase rounded-sm px-1 py-0">{file.errorMsg}</Badge>}
+              <div key={file.id} className="flex flex-col">
+                <div 
+                  className="flex items-center justify-between px-4 py-2.5 hover:bg-accent/5 transition-colors cursor-pointer"
+                  onClick={() => file.status === "processed" && (file.type === "csv" || file.type === "xlsx") && toggleFileExpansion(file.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-8 h-8 rounded-md flex items-center justify-center border",
+                      file.type === "pdf" ? "bg-red-50/50 border-red-100 text-red-500" : "bg-blue-50/50 border-blue-100 text-blue-500"
+                    )}>
+                      {file.type === "pdf" ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
+                    </div>
+                    <div>
+                      <p className="font-bold text-foreground text-[11px] truncate max-w-[200px]">{file.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase">{file.size}</span>
+                        {file.status === "validating" && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
+                        {file.status === "valid" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Ready</Badge>}
+                        {file.status === "processed" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
+                        {file.status === "error" && <Badge variant="destructive" className="text-[7px] font-bold uppercase rounded-sm px-1 py-0">{file.errorMsg}</Badge>}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {(file.type === "csv" || file.type === "xlsx") && file.status === "processed" && (
+                      <Button variant="ghost" size="icon" className="rounded-md h-6 w-6">
+                        {expandedFiles.has(file.id) ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="rounded-md h-7 w-7 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter(f => f.id !== file.id)); }}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="ghost" size="icon" className="rounded-md h-7 w-7 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter(f => f.id !== file.id)); }}>
-                  <X className="w-3 h-3" />
-                </Button>
+                
+                {/* Processing Results Details */}
+                {expandedFiles.has(file.id) && file.processingResults && (
+                  <div className="px-4 py-3 bg-accent/30 border-t border-accent/50 space-y-3">
+                    {/* Summary */}
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="bg-background rounded p-2">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Total</p>
+                        <p className="text-sm font-bold text-foreground">{file.processingResults.downloaded.length + file.processingResults.downloadFailed.length}</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Downloaded</p>
+                        <p className="text-sm font-bold text-green-600">{file.processingResults.downloaded.length}</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Processed</p>
+                        <p className="text-sm font-bold text-blue-600">{file.processingResults.processed.filter(r => r.ok).length}</p>
+                      </div>
+                      <div className="bg-background rounded p-2">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Failed</p>
+                        <p className="text-sm font-bold text-red-600">{file.processingResults.downloadFailed.length + file.processingResults.processFailed.length}</p>
+                      </div>
+                    </div>
+
+                    {/* Download Failures */}
+                    {file.processingResults.downloadFailed.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-bold text-red-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Download Failures ({file.processingResults.downloadFailed.length})
+                        </p>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {file.processingResults.downloadFailed.map((fail, idx) => (
+                            <div key={idx} className="bg-background rounded px-2 py-1.5 text-[9px]">
+                              <p className="font-semibold text-foreground">{fail.email}</p>
+                              <p className="text-muted-foreground truncate">{fail.error}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Processing Failures */}
+                    {file.processingResults.processFailed.length > 0 && (
+                      <div>
+                        <p className="text-[9px] font-bold text-orange-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Processing Failures ({file.processingResults.processFailed.length})
+                        </p>
+                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                          {file.processingResults.processFailed.map((fail, idx) => (
+                            <div key={idx} className="bg-background rounded px-2 py-1.5 text-[9px]">
+                              <p className="font-semibold text-foreground">{fail.candidate}</p>
+                              <p className="text-muted-foreground truncate">{fail.error}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -318,16 +647,19 @@ function ApplicantsContent() {
             disabled={!files.some(f => f.status === "processed") || isProcessing || isScreening}
             onClick={handleRunScreening}
           >
-            Open Results
-            <ArrowRight className="w-3.5 h-3.5 ml-1.5 group-hover:translate-x-1 transition-transform" />
+            View Results
           </Button>
         </div>
       </div>
     </div>
+    </Suspense>
   );
 }
 
 export default function Applicants() {
+  const [quotaErrorDialogOpen, setQuotaErrorDialogOpen] = useState(false);
+  const router = useRouter();
+
   return (
     <AppLayout>
       <Suspense fallback={
@@ -335,8 +667,27 @@ export default function Applicants() {
           <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
         </div>
       }>
-        <ApplicantsContent />
+        <ApplicantsContent setQuotaErrorDialogOpen={setQuotaErrorDialogOpen} />
       </Suspense>
+      <Dialog open={quotaErrorDialogOpen} onOpenChange={setQuotaErrorDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">API Quota Exceeded</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Your Gemini API quota has been reached. Please go to Settings and update your API key or switch to a different model.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuotaErrorDialogOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => router.push('/settings')}>
+              Go to Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
+

@@ -4,6 +4,7 @@ import {
   ingestResumesExtractText,
   ingestResumesProcess,
   ingestResumesParseWithGemini,
+  ingestResumesFromCsv,
 } from "../controllers/resumeController.ts";
 import { authenticateToken } from "../middleware/auth.ts";
 
@@ -41,6 +42,11 @@ router.post(
   "/jobs/:jobId/resumes/process",
   upload.array("files", 50),
   ingestResumesProcess
+);
+
+router.post(
+  "/jobs/:jobId/resumes/process-csv",
+  ingestResumesFromCsv
 );
 
 router.post("/jobs/:jobId/chat-results", async (req: any, res: any) => {

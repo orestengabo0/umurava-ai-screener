@@ -425,25 +425,36 @@ export async function ingestResumesParseWithGemini(
             };
           }
 
-          const modelText = await aiLimit(() =>
-            generateJsonFromResumeText({
-              resumeText,
-              jobContext: {
-                title: job.title,
-                description: job.description,
-                requiredSkills: job.requiredSkills,
-                requirements: job.requirements,
-                experienceLevel: job.experienceLevel,
-                minExperience: job.minExperience,
-                employmentType: job.employmentType,
-                ...(job.location !== undefined ? { location: job.location } : {}),
-                ...(job.educationLevel !== undefined
-                  ? { educationLevel: job.educationLevel }
-                  : {}),
-              },
-              userId: (req as any).user?.userId,
-            })
-          );
+          const modelText = await aiLimit(async () => {
+            try {
+              return await generateJsonFromResumeText({
+                resumeText,
+                jobContext: {
+                  title: job.title,
+                  description: job.description,
+                  requiredSkills: job.requiredSkills,
+                  requirements: job.requirements,
+                  experienceLevel: job.experienceLevel,
+                  minExperience: job.minExperience,
+                  employmentType: job.employmentType,
+                  ...(job.location !== undefined ? { location: job.location } : {}),
+                  ...(job.educationLevel !== undefined
+                    ? { educationLevel: job.educationLevel }
+                    : {}),
+                },
+                userId: (req as any).user?.userId,
+              });
+            } catch (aiError) {
+              const errorMessage = aiError instanceof Error ? aiError.message : 'AI processing failed';
+              
+              // Check for quota exceeded error
+              if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
+                throw new Error('API quota exceeded. Please update your API key or switch to a different model in Settings.');
+              }
+              
+              throw aiError;
+            }
+          });
 
           const jsonText = extractFirstJsonObject(modelText);
           const json = JSON.parse(jsonText) as unknown;
@@ -495,6 +506,286 @@ export async function ingestResumesParseWithGemini(
     };
 
     res.status(200).json({ jobId, summary, results });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── POST /api/jobs/:jobId/resumes/process-csv ─────────────────────────────
+export async function ingestResumesFromCsv(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { jobId } = req.params as { jobId: string };
+    const userId = (req as any).user?.userId;
+    const { candidates } = req.body as { candidates: Array<{ firstName: string; lastName: string; email: string; phone?: string; resumeLink?: string }> };
+
+    if (!candidates || !Array.isArray(candidates)) {
+      res.status(400).json({ message: "Candidates array is required" });
+      return;
+    }
+
+    // Filter candidates with resume links
+    const candidatesWithLinks = candidates.filter(c => c.resumeLink && c.resumeLink.trim().length > 0);
+
+    if (candidatesWithLinks.length === 0) {
+      res.status(400).json({ message: "No candidates with resume links found" });
+      return;
+    }
+
+    // Helper function to convert Google Docs URL to export URL
+    function convertGoogleDocsUrl(url: string): string {
+      if (url.includes('docs.google.com/document')) {
+        const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match) {
+          return `https://docs.google.com/document/d/${match[1]}/export?format=pdf`;
+        }
+      }
+      return url;
+    }
+
+    // Download resumes concurrently with p-limit
+    const downloadLimit = pLimit(5); // Download 5 resumes at a time
+    const DOWNLOAD_TIMEOUT = 30000; // 30 seconds per download
+
+    const downloadResults = await Promise.allSettled(
+      candidatesWithLinks.map((candidate) =>
+        downloadLimit(async () => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT);
+
+            // Convert Google Docs URL if needed
+            const downloadUrl = convertGoogleDocsUrl(candidate.resumeLink!);
+
+            console.log(`[CSV Processing] Downloading resume for ${candidate.email} from: ${downloadUrl}`);
+
+            const response = await fetch(downloadUrl, {
+              signal: controller.signal,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              },
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const buffer = Buffer.from(await response.arrayBuffer());
+
+            // Validate it's a PDF
+            if (!buffer.toString('hex', 0, 4).includes('25504446')) {
+              throw new Error('Downloaded file is not a valid PDF');
+            }
+
+            console.log(`[CSV Processing] Successfully downloaded resume for ${candidate.email}, size: ${buffer.length} bytes`);
+
+            return {
+              success: true,
+              candidate,
+              buffer,
+            };
+          } catch (error) {
+            console.error(`[CSV Processing] Failed to download resume for ${candidate.email}:`, error);
+            return {
+              success: false,
+              candidate,
+              error: error instanceof Error ? error.message : 'Download failed',
+            };
+          }
+        })
+      )
+    );
+
+    // Separate successful downloads from failures
+    const successfulDownloads: Array<{ candidate: any; buffer: Buffer }> = [];
+    const failedDownloads: Array<{ candidate: any; error: string }> = [];
+
+    downloadResults.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value.success === true && result.value.buffer) {
+        successfulDownloads.push({ candidate: result.value.candidate, buffer: result.value.buffer });
+      } else if (result.status === 'fulfilled' && result.value.success === false && result.value.error) {
+        failedDownloads.push({ candidate: result.value.candidate, error: result.value.error });
+      }
+    });
+
+    // Process successful downloads through the existing pipeline
+    const processLimit = pLimit(3); // Process 3 resumes at a time
+    const processResults = await Promise.allSettled(
+      successfulDownloads.map(({ candidate, buffer }) =>
+        processLimit(async () => {
+          try {
+            console.log(`[CSV Processing] Processing resume for ${candidate.email}`);
+            
+            const job = await JobModel.findById(jobId).lean();
+            if (!job) {
+              throw new Error("Job not found");
+            }
+
+            // Extract text from PDF
+            console.log(`[CSV Processing] Extracting text from PDF for ${candidate.email}`);
+            const extractedText = await extractTextFromPdf(new Uint8Array(buffer));
+
+            if (extractedText.length < MIN_EXTRACTED_TEXT_LENGTH) {
+              throw new Error("Extracted text too short");
+            }
+
+            console.log(`[CSV Processing] Extracted ${extractedText.length} characters from ${candidate.email}'s resume`);
+
+            // Parse with AI
+            let parsed: string;
+            try {
+              console.log(`[CSV Processing] Sending to AI for ${candidate.email}`);
+              parsed = await generateJsonFromResumeText({
+                resumeText: extractedText,
+                jobContext: {
+                  title: job.title,
+                  description: job.description,
+                  requiredSkills: job.requiredSkills || [],
+                },
+                userId: userId || "",
+              });
+              console.log(`[CSV Processing] AI parsing complete for ${candidate.email}`);
+              console.log(`[CSV Processing] AI output for ${candidate.email}:`, parsed);
+            } catch (aiError) {
+              const errorMessage = aiError instanceof Error ? aiError.message : 'AI processing failed';
+              
+              // Check for quota exceeded error
+              if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
+                throw new Error('API quota exceeded. Please update your API key or switch to a different model in Settings.');
+              }
+              
+              throw aiError;
+            }
+
+            // Extract JSON from AI response (may be wrapped in markdown code blocks)
+            const jsonText = extractFirstJsonObject(parsed);
+            const json = JSON.parse(jsonText) as unknown;
+
+            // Validate schema
+            const validated = applicantParseSchema.safeParse(json);
+
+            if (!validated.success) {
+              console.error(`[CSV Processing] Schema validation failed for ${candidate.email}:`, validated.error);
+              throw new Error("AI output failed schema validation");
+            }
+
+            // Check if applicant already exists for this job
+            const existingApplicant = await Applicant.findOne({
+              jobId,
+              email: candidate.email,
+            });
+
+            if (existingApplicant) {
+              console.log(`[CSV Processing] Applicant ${candidate.email} already exists for this job, skipping`);
+              return {
+                ok: true,
+                candidate: candidate.email,
+                applicantId: existingApplicant._id.toString(),
+                skipped: true,
+              };
+            }
+
+            // Create applicant
+            console.log(`[CSV Processing] Creating applicant record for ${candidate.email}`);
+            const applicant = new Applicant({
+              ...validated.data,
+              jobId,
+              uploadedAt: new Date(),
+              fileType: "pdf",
+              fileName: `${candidate.firstName}_${candidate.lastName}_resume.pdf`,
+              email: candidate.email,
+              phone: candidate.phone,
+            });
+
+            await applicant.save();
+            console.log(`[CSV Processing] Saved applicant ${applicant._id} for ${candidate.email}`);
+
+            // Upload to Cloudinary
+            console.log(`[CSV Processing] Uploading to Cloudinary for ${candidate.email}`);
+            const cloudinaryResult = await uploadPdfBuffer({
+              buffer: buffer,
+              folder: jobId,
+              filename: `${candidate.firstName}_${candidate.lastName}_resume.pdf`,
+            });
+
+            // Save resume file record
+            const resumeFile = new ResumeFileModel({
+              applicantId: applicant._id,
+              cloudinaryPublicId: cloudinaryResult.publicId,
+              cloudinaryUrl: cloudinaryResult.url,
+              extractedText,
+              uploadedAt: new Date(),
+              size: buffer.length,
+              mimeType: "application/pdf",
+              originalName: `${candidate.firstName}_${candidate.lastName}_resume.pdf`,
+              jobId,
+            });
+
+            await resumeFile.save();
+            console.log(`[CSV Processing] Successfully processed ${candidate.email}, applicant ID: ${applicant._id}`);
+
+            return {
+              ok: true,
+              candidate: candidate.email,
+              applicantId: applicant._id.toString(),
+            };
+          } catch (error) {
+            console.error(`[CSV Processing] Failed to process ${candidate.email}:`, error);
+            return {
+              ok: false,
+              candidate: candidate.email,
+              error: error instanceof Error ? error.message : 'Processing failed',
+            };
+          }
+        })
+      )
+    );
+
+    const processedResults: Array<{ ok: boolean; candidate: string; applicantId?: string; error?: string }> = [];
+
+    processResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        processedResults.push(result.value);
+      } else {
+        processedResults.push({
+          ok: false,
+          candidate: 'unknown',
+          error: result.reason instanceof Error ? result.reason.message : 'Processing failed',
+        });
+      }
+    });
+
+    // Combine results
+    const summary = {
+      total: candidates.length,
+      withLinks: candidatesWithLinks.length,
+      downloaded: successfulDownloads.length,
+      downloadFailed: failedDownloads.length,
+      processed: processedResults.filter(r => r.ok).length,
+      processFailed: processedResults.filter(r => !r.ok).length,
+    };
+
+    console.log(`[CSV Processing] Summary:`, summary);
+    console.log(`[CSV Processing] Downloaded: ${successfulDownloads.map(r => r.candidate.email).join(', ')}`);
+    console.log(`[CSV Processing] Download Failed: ${failedDownloads.map(r => `${r.candidate.email} (${r.error})`).join(', ')}`);
+    console.log(`[CSV Processing] Processed: ${processedResults.filter(r => r.ok).map(r => r.candidate).join(', ')}`);
+    console.log(`[CSV Processing] Process Failed: ${processedResults.filter(r => !r.ok).map(r => `${r.candidate} (${r.error})`).join(', ')}`);
+
+    res.status(200).json({
+      success: true,
+      summary,
+      results: {
+        downloaded: successfulDownloads.map(r => r.candidate.email),
+        downloadFailed: failedDownloads.map(r => ({ email: r.candidate.email, error: r.error })),
+        processed: processedResults.filter(r => r.ok),
+        processFailed: processedResults.filter(r => !r.ok),
+      },
+    });
   } catch (err) {
     next(err);
   }
