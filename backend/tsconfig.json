@@ -1,30 +1,12 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
     "rootDir": "./src",
     "outDir": "./dist",
-
-    // Environment Settings
-    "module": "nodenext",
-    "target": "esnext",
-    "types": ["node"],
-
-    // Allow .ts extensions in imports (required for tsx + nodenext)
-    "allowImportingTsExtensions": true,
-    // noEmit is required when allowImportingTsExtensions is true
-    "noEmit": true,
-
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Recommended Options
+    "module": "NodeNext",
+    "target": "ESNext",
     "strict": true,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
+    "esModuleInterop": true,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src"]
 }
