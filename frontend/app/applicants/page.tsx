@@ -23,7 +23,7 @@ import { getJobs, type Job } from "@/lib/api/jobs";
 import { Badge } from "@/components/ui/badge";
 
 interface UploadedFile {
-  id: number;
+  id: string;
   name: string;
   size: string;
   type: "pdf" | "csv" | "xlsx";
@@ -54,9 +54,10 @@ function ApplicantsContent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  const [idCounter, setIdCounter] = useState(1);
   const [isScreening, setIsScreening] = useState(false);
   const [screeningProgress, setScreeningProgress] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progressPercentage, setProgressPercentage] = useState(0);
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
@@ -80,8 +81,7 @@ function ApplicantsContent() {
         return;
       }
 
-      const id = idCounter;
-      setIdCounter((c) => c + 1);
+      const id = Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
 
       const entry: UploadedFile = {
         id,
@@ -166,6 +166,9 @@ function ApplicantsContent() {
     const validFiles = files.filter(f => f.status === "valid");
     if (validFiles.length === 0 || !selectedJobId) return;
 
+    setIsProcessing(true);
+    setProgressPercentage(0);
+
     setFiles((prev) =>
       prev.map((f) => (f.status === "valid" ? { ...f, status: "processing" } : f))
     );
@@ -173,6 +176,7 @@ function ApplicantsContent() {
     const baseRaw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
     const base = baseRaw.endsWith("/api") ? baseRaw.slice(0, -4) : baseRaw;
 
+    let processedCount = 0;
     for (const f of validFiles) {
       setScreeningProgress(`Analyzing ${f.name}...`);
       try {
@@ -196,8 +200,11 @@ function ApplicantsContent() {
           prev.map((file) => (file.id === f.id ? { ...file, status: "error", errorMsg: "Upload failed" } : file))
         );
       }
+      processedCount++;
+      setProgressPercentage(Math.round((processedCount / validFiles.length) * 100));
     }
     setScreeningProgress("");
+    setIsProcessing(false);
   };
 
   return (
@@ -207,32 +214,6 @@ function ApplicantsContent() {
         <p className="text-muted-foreground mt-0.5 text-[10px] font-bold uppercase tracking-wider">
           Batch process resumes with AI Intelligence
         </p>
-      </div>
-
-      <div className="bg-card border rounded-md p-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-              <Target className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="font-bold text-foreground uppercase tracking-widest text-[9px]">Target Mission</p>
-              <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">Assign to specific job</p>
-            </div>
-          </div>
-          <select
-            value={selectedJobId}
-            onChange={(e) => setSelectedJobId(e.target.value)}
-            className="h-9 min-w-[220px] rounded-md border bg-accent/20 px-3 text-[11px] font-bold outline-none cursor-pointer"
-            disabled={jobsLoading}
-          >
-            {jobs.length === 0 ? (
-              <option value="">{jobsLoading ? "Loading..." : "No open jobs"}</option>
-            ) : (
-              jobs.map((j) => <option key={j._id} value={j._id}>{j.title}</option>)
-            )}
-          </select>
-        </div>
       </div>
 
       <div
@@ -274,7 +255,7 @@ function ApplicantsContent() {
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "w-8 h-8 rounded-md flex items-center justify-center border",
-                    file.type === "pdf" ? "bg-red-50/50 border-red-100 text-red-500" : "bg-green-50/50 border-green-100 text-green-500"
+                    file.type === "pdf" ? "bg-red-50/50 border-red-100 text-red-500" : "bg-blue-50/50 border-blue-100 text-blue-500"
                   )}>
                     {file.type === "pdf" ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
                   </div>
@@ -284,7 +265,7 @@ function ApplicantsContent() {
                       <span className="text-[8px] font-bold text-muted-foreground uppercase">{file.size}</span>
                       {file.status === "validating" && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
                       {file.status === "valid" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Ready</Badge>}
-                      {file.status === "processed" && <Badge className="bg-green-600/10 text-green-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
+                      {file.status === "processed" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
                       {file.status === "error" && <Badge variant="destructive" className="text-[7px] font-bold uppercase rounded-sm px-1 py-0">{file.errorMsg}</Badge>}
                     </div>
                   </div>
@@ -306,15 +287,24 @@ function ApplicantsContent() {
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
-            className="flex-1 sm:flex-none rounded-md h-9 px-4 font-bold text-[11px] uppercase tracking-wider"
-            disabled={!files.some(f => f.status === "valid") || isScreening}
+            className="flex-1 sm:flex-none rounded-md h-9 px-4 font-bold text-[11px] uppercase tracking-wider relative overflow-hidden"
+            disabled={!files.some(f => f.status === "valid") || isProcessing || isScreening}
             onClick={handleProcessToJob}
           >
-            Start Analysis
+            {isProcessing && (
+              <div 
+                className="absolute left-0 top-0 bottom-0 bg-primary/10 transition-all duration-300"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-2">
+              {isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isProcessing ? `Processing... ${progressPercentage}%` : "Start Analysis"}
+            </span>
           </Button>
           <Button
             className="flex-1 sm:flex-none rounded-md h-9 px-5 font-bold text-[11px] uppercase tracking-wider group"
-            disabled={!files.some(f => f.status === "processed") || isScreening}
+            disabled={!files.some(f => f.status === "processed") || isProcessing || isScreening}
             onClick={handleRunScreening}
           >
             Open Results

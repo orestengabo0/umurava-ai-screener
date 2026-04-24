@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
   const kpis = [
     { title: "Total Jobs", value: stats?.totalJobs || 0, icon: Briefcase, color: "text-blue-600", bg: "bg-blue-50" },
-    { title: "Open Jobs", value: stats?.openJobs || 0, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
+    { title: "Open Jobs", value: stats?.openJobs || 0, icon: CheckCircle, color: "text-blue-600", bg: "bg-blue-50" },
     { title: "Total Applicants", value: stats?.totalApplicants || 0, icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
     { title: "Avg. Match Score", value: "78%", icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-50" },
   ];
@@ -144,9 +144,6 @@ export default function DashboardPage() {
               <CardContent className="p-4 pt-0 space-y-2">
                 <Button className="w-full justify-start rounded-md h-9 text-xs font-bold" variant="outline" asChild>
                   <a href="/jobs/create">Create New Job</a>
-                </Button>
-                <Button className="w-full justify-start rounded-md h-9 text-xs font-bold" variant="outline" asChild>
-                  <a href="/applicants">Batch Screen Resumes</a>
                 </Button>
               </CardContent>
             </Card>

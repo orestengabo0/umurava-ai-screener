@@ -224,20 +224,6 @@ export default function JobDetailPage() {
                 </Button>
               </div>
             </div>
-
-            <div className="bg-primary rounded-md p-5 text-primary-foreground relative overflow-hidden shadow-sm">
-              <h3 className="font-bold text-base tracking-tight mb-1">AI Screening</h3>
-              <p className="text-[10px] font-medium opacity-80 leading-relaxed mb-3">
-                Gemini-powered candidate analysis is active.
-              </p>
-              <div className="bg-white/10 rounded-md p-2.5 flex items-center justify-between border border-white/20">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-sm bg-white flex items-center justify-center text-primary font-bold text-[10px]">75%</div>
-                  <span className="text-[9px] font-bold uppercase tracking-wider">Avg Fit</span>
-                </div>
-                <ExternalLink className="w-3 h-3 opacity-50" />
-              </div>
-            </div>
           </div>
         </div>
 
