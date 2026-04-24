@@ -3,10 +3,10 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { MarkdownMessage } from "@/components/MarkdownMessage";
-import { 
-  ArrowLeft, 
-  Loader2, 
-  Brain, 
+import {
+  ArrowLeft,
+  Loader2,
+  Brain,
   Send,
   MessageSquare,
   ChevronDown,
@@ -43,7 +43,7 @@ export default function JobResultsPage() {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  
+
   // Chat state
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<any[]>([
@@ -93,7 +93,7 @@ export default function JobResultsPage() {
     setChatLoading(true);
 
     try {
-      const res = await axios.post(`${API_BASE_URL}/jobs/${jobId}/chat-results`, { 
+      const res = await axios.post(`${API_BASE_URL}/jobs/${jobId}/chat-results`, {
         message: msg,
         context: applicants.map(a => ({
           name: `${a.firstName} ${a.lastName}`,
@@ -149,7 +149,7 @@ export default function JobResultsPage() {
                 </p>
               </div>
             </div>
-            <Button 
+            <Button
               className="rounded-md h-9 px-4 font-bold gap-2 text-xs"
               onClick={() => setChatOpen(true)}
             >
@@ -160,8 +160,8 @@ export default function JobResultsPage() {
 
           <div className="space-y-2 pb-8">
             {applicants.map((c, i) => (
-              <div 
-                key={c._id} 
+              <div
+                key={c._id}
                 className={cn(
                   "rounded-md border bg-card overflow-hidden shadow-sm transition-all",
                   expanded === c._id ? "ring-1 ring-primary/20 border-primary/30" : ""
@@ -208,25 +208,25 @@ export default function JobResultsPage() {
                         </div>
                       </div>
                       <div className="space-y-3">
-  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-    <AlertTriangle className="w-4 h-4 text-muted-foreground" />
-    Gaps
-  </p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-muted-foreground" />
+                          Gaps
+                        </p>
 
-  <div className="flex flex-wrap gap-2">
-    {c.gaps?.map((g: string) => (
-      <Badge
-        key={g}
-        variant="outline"
-        className="bg-muted text-foreground border-border px-2.5 py-1 rounded-md text-xs font-medium"
-      >
-        {g}
-      </Badge>
-    ))}
-  </div>
-</div>
+                        <div className="flex flex-wrap gap-2">
+                          {c.gaps?.map((g: string) => (
+                            <Badge
+                              key={g}
+                              variant="outline"
+                              className="bg-muted text-foreground border-border px-2.5 py-1 rounded-md text-xs font-medium"
+                            >
+                              {g}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    
+
                     <div className="bg-white border rounded-md p-3 shadow-sm">
                       <p className="text-[9px] font-bold text-primary uppercase tracking-widest mb-1.5">AI Summary</p>
                       <p className="text-xs font-medium text-foreground leading-relaxed italic border-l-2 border-primary/20 pl-2.5">
@@ -235,7 +235,7 @@ export default function JobResultsPage() {
                     </div>
 
                     <div className="flex items-center justify-end pt-1">
-                      <Button 
+                      <Button
                         className="rounded-md h-8 px-3 font-bold gap-1.5 text-[10px]"
                         onClick={() => router.push(`/applicants/${c._id}`)}
                       >
@@ -272,8 +272,8 @@ export default function JobResultsPage() {
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={cn(
                   "max-w-[88%] rounded-md px-3 py-2 text-[11px] leading-relaxed",
-                  m.role === "user" 
-                    ? "bg-primary text-primary-foreground" 
+                  m.role === "user"
+                    ? "bg-primary text-primary-foreground"
                     : "bg-white border text-foreground"
                 )}>
                   <MarkdownMessage content={m.content} isUser={m.role === "user"} />
