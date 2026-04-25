@@ -7,7 +7,7 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
-import cors from "cors";
+import cors, { CorsOptions } from "cors";
 import swaggerUi from "swagger-ui-express";
 import { connectDB } from "./config/db.ts";
 import jobRoutes from "./routes/jobRoutes.ts";
@@ -25,27 +25,23 @@ async function bootstrap() {
   await connectDB();
 
   const app = express();
+const allowedOrigins: string[] = [
+  "https://umurava-ai-screener.vercel.app",
+  "http://localhost:3000"
+];
 
-  const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
-  .split(",").map(origin => origin.trim());
+const corsOptions: CorsOptions = {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+};
 
-  console.log("CORS_ORIGINS:", process.env.CORS_ORIGINS);
-
-  app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.log("Blocked by CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
   app.use(express.json({ limit: "2mb" }));
 
   // Routes
