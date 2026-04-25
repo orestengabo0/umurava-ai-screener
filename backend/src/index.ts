@@ -26,15 +26,24 @@ async function bootstrap() {
 
   const app = express();
 
-  const allowedOrigins = (process.env.CORS_ORIGINS ?? "http://localhost:3000")
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
   .split(",").map(origin => origin.trim());
 
   app.use(
-    cors({
-      origin: allowedOrigins,
-      credentials: true,
-    }),
-  );
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.log("Blocked by CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
   app.use(express.json({ limit: "2mb" }));
 
   // Routes
