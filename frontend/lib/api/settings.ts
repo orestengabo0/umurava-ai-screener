@@ -22,7 +22,7 @@ export interface TestSettingsData {
 
 export async function getSettings(): Promise<Settings> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/settings`, {
+  const response = await fetch(`${API_BASE}/api/settings`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -38,7 +38,7 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(data: UpdateSettingsData): Promise<Settings> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/settings`, {
+  const response = await fetch(`${API_BASE}/api/settings`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -57,7 +57,7 @@ export async function updateSettings(data: UpdateSettingsData): Promise<Settings
 
 export async function testSettings(data: TestSettingsData): Promise<{ success: boolean; message: string; error?: string }> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/settings/test`, {
+  const response = await fetch(`${API_BASE}/api/settings/test`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -76,7 +76,7 @@ export async function testSettings(data: TestSettingsData): Promise<{ success: b
 
 export async function testStoredSettings(): Promise<{ success: boolean; message: string; error?: string }> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/settings/test-stored`, {
+  const response = await fetch(`${API_BASE}/api/settings/test-stored`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -94,7 +94,7 @@ export async function testStoredSettings(): Promise<{ success: boolean; message:
 
 export async function deleteSettings(): Promise<void> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}/settings`, {
+  const response = await fetch(`${API_BASE}/api/settings`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
