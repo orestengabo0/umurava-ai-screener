@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_BASE = _RAW_BASE.endsWith("/api") ? _RAW_BASE.slice(0, -4) : _RAW_BASE;
 
 export interface LoginData {
   email: string;
@@ -37,7 +38,7 @@ export interface User {
 }
 
 export async function login(data: LoginData): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
+  const response = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -54,7 +55,7 @@ export async function login(data: LoginData): Promise<AuthResponse> {
 }
 
 export async function register(data: RegisterData): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/auth/register`, {
+  const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -71,7 +72,7 @@ export async function register(data: RegisterData): Promise<AuthResponse> {
 }
 
 export async function forgotPassword(data: ForgotPasswordData): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+  const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,7 +87,7 @@ export async function forgotPassword(data: ForgotPasswordData): Promise<void> {
 }
 
 export async function resetPassword(data: ResetPasswordData): Promise<void> {
-  const response = await fetch(`${API_BASE}/auth/reset-password`, {
+  const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -101,7 +102,7 @@ export async function resetPassword(data: ResetPasswordData): Promise<void> {
 }
 
 export async function getMe(token: string): Promise<{ user: User }> {
-  const response = await fetch(`${API_BASE}/auth/me`, {
+  const response = await fetch(`${API_BASE}/api/auth/me`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
