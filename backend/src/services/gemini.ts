@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { SettingsModel } from "../models/Settings.ts";
+import { SettingsModel } from "../models/Settings.js";
 
 let genAI: GoogleGenerativeAI | null = null;
 

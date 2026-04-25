@@ -5,8 +5,8 @@ import {
   testSettingsHandler,
   testStoredSettingsHandler,
   deleteSettingsHandler,
-} from "../controllers/settingsController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+} from "../controllers/settingsController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 

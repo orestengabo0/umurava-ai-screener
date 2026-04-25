@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
-import { Applicant } from "../models/Applicant.ts";
-import { ResumeFileModel } from "../models/ResumeFile.ts";
-import { deleteRawAsset } from "../services/cloudinary.ts";
-import { getGeminiClientForUser } from "../services/gemini.ts";
+import { Applicant } from "../models/Applicant.js";
+import { ResumeFileModel } from "../models/ResumeFile.js";
+import { deleteRawAsset } from "../services/cloudinary.js";
+import { getGeminiClientForUser } from "../services/gemini.js";
 
 export const uploadApplicants = async (req: Request, res: Response) => {
   try {

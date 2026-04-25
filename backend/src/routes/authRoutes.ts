@@ -5,8 +5,8 @@ import {
   forgotPasswordHandler,
   resetPasswordHandler,
   getMe,
-} from "../controllers/authController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+} from "../controllers/authController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 

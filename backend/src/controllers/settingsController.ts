@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { SettingsModel } from "../models/Settings.ts";
+import { SettingsModel } from "../models/Settings.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 

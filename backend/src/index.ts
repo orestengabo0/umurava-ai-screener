@@ -9,15 +9,15 @@ import express, {
 } from "express";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
-import { connectDB } from "./config/db.ts";
-import jobRoutes from "./routes/jobRoutes.ts";
-import applicantRoutes from "./routes/applicantRoutes.ts";
-import resumeRoutes from "./routes/resumeRoutes.ts";
-import dashboardRoutes from "./routes/dashboardRoutes.ts";
-import authRoutes from "./routes/authRoutes.ts";
-import settingsRoutes from "./routes/settingsRoutes.ts";
-import screenRoutes from "./routes/screenRoutes.ts";
-import { openApiSpec } from "./swagger.ts";
+import { connectDB } from "./config/db.js";
+import jobRoutes from "./routes/jobRoutes.js";
+import applicantRoutes from "./routes/applicantRoutes.js";
+import resumeRoutes from "./routes/resumeRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
+import screenRoutes from "./routes/screenRoutes.js";
+import { openApiSpec } from "./swagger.js";
 
 async function bootstrap() {
   const port = Number(process.env.PORT ?? 5000);

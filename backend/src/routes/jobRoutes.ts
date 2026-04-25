@@ -6,8 +6,8 @@ import {
   setJobStatus,
   deleteJob,
   updateJob,
-} from "../controllers/jobController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+} from "../controllers/jobController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 
