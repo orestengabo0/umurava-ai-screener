@@ -469,12 +469,6 @@ Contributions are welcome! Please follow these guidelines:
 
 ---
 
-## License
-
-ISC License - See LICENSE file for details
-
----
-
 ## Support & Contact
 
 For issues, questions, or feature requests, please open an issue on GitHub or contact the development team.
@@ -484,4 +478,3 @@ For issues, questions, or feature requests, please open an issue on GitHub or co
 ---
 
 **Last Updated**: April 2026  
-**Maintained By**: Umurava Team"
