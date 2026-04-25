@@ -17,12 +17,24 @@ export interface SendPasswordResetEmailParams {
   firstName?: string;
 }
 
+function getFrontendUrl(): string {
+  const rawUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
+  const urls = rawUrl.split(",").map((url) => url.trim());
+
+  if(process.env.NODE_ENV === "production" && urls.length > 1) {
+    return urls[urls.length -1];
+  }
+
+  return urls[0];
+}
+
 export async function sendPasswordResetEmail({
   to,
   resetToken,
   firstName = "User",
 }: SendPasswordResetEmailParams): Promise<void> {
-  const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/?token=${resetToken}`;
+  const resetUrl = `${getFrontendUrl()}/?token=${resetToken}`;
 
   const mailOptions = {
     from: `"Umurava AI Screener" <${process.env.EMAIL_USER}>`,
