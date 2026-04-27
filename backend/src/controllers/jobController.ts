@@ -9,12 +9,15 @@ export async function createJob(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { title, description, requiredSkills, experienceLevel, location } =
+    const { title, description, requiredSkills, experienceLevel, minExperience, employmentType, requirements, location } =
       req.body as {
         title?: string;
         description?: string;
         requiredSkills?: string[];
         experienceLevel?: ExperienceLevel;
+        minExperience?: number;
+        employmentType?: string;
+        requirements?: string[];
         location?: string;
       };
 
@@ -23,12 +26,35 @@ export async function createJob(
       return;
     }
 
+    if (!experienceLevel) {
+      res.status(400).json({ message: "experienceLevel is required" });
+      return;
+    }
+
+    if (minExperience === undefined || minExperience === null) {
+      res.status(400).json({ message: "minExperience is required" });
+      return;
+    }
+
+    if (!employmentType) {
+      res.status(400).json({ message: "employmentType is required" });
+      return;
+    }
+
+    if (!requirements || requirements.length === 0) {
+      res.status(400).json({ message: "requirements must be a non-empty array" });
+      return;
+    }
+
     const jobData: Record<string, any> = {
       title,
       description,
       requiredSkills: requiredSkills ?? [],
+      experienceLevel,
+      minExperience,
+      employmentType,
+      requirements,
     };
-    if (experienceLevel) jobData.experienceLevel = experienceLevel;
     if (location) jobData.location = location;
 
     const job = await JobModel.create(jobData);
