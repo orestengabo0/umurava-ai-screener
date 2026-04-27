@@ -71,8 +71,8 @@ export interface GetJobsResponse {
   totalPages: number;
 }
 
-export async function getJobs(params?: { 
-  status?: JobStatus; 
+export async function getJobs(params?: {
+  status?: JobStatus;
   search?: string;
   page?: number;
   limit?: number;
@@ -82,8 +82,8 @@ export async function getJobs(params?: {
   if (params?.search) url.searchParams.set("search", params.search);
   if (params?.page) url.searchParams.set("page", params.page.toString());
   if (params?.limit) url.searchParams.set("limit", params.limit.toString());
-  
-  const res = await fetch(url.toString(), { 
+
+  const res = await fetch(url.toString(), {
     cache: "no-store",
     headers: getAuthHeaders(),
   });
@@ -91,7 +91,7 @@ export async function getJobs(params?: {
 }
 
 export async function getJob(id: string): Promise<Job> {
-  const res = await fetch(`${BASE}/api/jobs/${id}`, { 
+  const res = await fetch(`${BASE}/api/jobs/${id}`, {
     cache: "no-store",
     headers: getAuthHeaders(),
   });
@@ -129,7 +129,7 @@ export async function setJobStatus(
 }
 
 export async function deleteJob(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/jobs/${id}`, { 
+  const res = await fetch(`${BASE}/api/jobs/${id}`, {
     method: "DELETE",
     headers: getAuthHeaders(),
   });

@@ -72,8 +72,8 @@ export async function getJobs(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { status, search, page = "1", limit = "10" } = req.query as { 
-      status?: string; 
+    const { status, search, page = "1", limit = "10" } = req.query as {
+      status?: string;
       search?: string;
       page?: string;
       limit?: string;

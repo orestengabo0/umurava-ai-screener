@@ -43,12 +43,12 @@ export interface Job {
 function normalizeStringArray(values: string[]) {
   return Array.isArray(values)
     ? Array.from(
-        new Set(
-          values
-            .map((s) => (typeof s === "string" ? s.trim() : ""))
-            .filter((s) => s.length > 0)
-        )
+      new Set(
+        values
+          .map((s) => (typeof s === "string" ? s.trim() : ""))
+          .filter((s) => s.length > 0)
       )
+    )
     : [];
 }
 
