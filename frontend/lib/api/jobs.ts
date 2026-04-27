@@ -7,7 +7,8 @@ import { getToken } from "./auth";
 const _RAW_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 const BASE = _RAW_BASE.endsWith("/api") ? _RAW_BASE.slice(0, -4) : _RAW_BASE;
 
-export type ExperienceLevel = "entry" | "mid" | "senior" | "lead" | "executive";
+export type ExperienceLevel = "junior" | "mid" | "senior" | "lead";
+export type EmploymentType = "full-time" | "part-time" | "contract" | "internship";
 export type JobStatus = "open" | "closed";
 
 export interface Job {
@@ -15,7 +16,10 @@ export interface Job {
   title: string;
   description: string;
   requiredSkills: string[];
-  experienceLevel?: ExperienceLevel;
+  experienceLevel: ExperienceLevel;
+  minExperience: number;
+  employmentType: EmploymentType;
+  requirements: string[];
   location?: string;
   status: JobStatus;
   createdAt: string;
@@ -26,7 +30,10 @@ export interface CreateJobPayload {
   title: string;
   description: string;
   requiredSkills: string[];
-  experienceLevel?: ExperienceLevel;
+  experienceLevel: ExperienceLevel;
+  minExperience: number;
+  employmentType: EmploymentType;
+  requirements: string[];
   location?: string;
 }
 
