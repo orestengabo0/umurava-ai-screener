@@ -21,6 +21,10 @@ export default function CreateJobPage() {
   const [description, setDescription] = useState("");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel | "">("");
+  const [minExperience, setMinExperience] = useState("");
+  const [employmentType, setEmploymentType] = useState("");
+  const [requirements, setRequirements] = useState<string[]>([]);
+  const [currentRequirement, setCurrentRequirement] = useState("");
   const [location, setLocation] = useState("");
   const [customSkill, setCustomSkill] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,13 +49,32 @@ export default function CreateJobPage() {
       toast.error("Job title and description are required.");
       return;
     }
+    if (!experienceLevel) {
+      toast.error("Experience level is required.");
+      return;
+    }
+    if (!minExperience || isNaN(Number(minExperience)) || Number(minExperience) < 0) {
+      toast.error("Minimum experience must be a valid number.");
+      return;
+    }
+    if (!employmentType) {
+      toast.error("Employment type is required.");
+      return;
+    }
+    if (requirements.length === 0) {
+      toast.error("Please add at least one requirement.");
+      return;
+    }
     setLoading(true);
     try {
       const job = await createJob({
         title: title.trim(),
         description: description.trim(),
         requiredSkills: selectedSkills,
-        experienceLevel: experienceLevel || undefined,
+        experienceLevel: experienceLevel as ExperienceLevel,
+        minExperience: Number(minExperience),
+        employmentType: employmentType as any,
+        requirements,
         location: location.trim() || undefined,
       });
       toast.success("Job created successfully");
@@ -139,7 +162,7 @@ export default function CreateJobPage() {
 
             {/* Skills */}
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Skills & Stack</label>
+              <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Skills & Stack <span className="text-muted-foreground font-normal text-[9px]">(optional)</span></label>
               
               <form onSubmit={addCustomSkill} className="flex gap-1.5 max-w-sm">
                 <input 
@@ -147,6 +170,7 @@ export default function CreateJobPage() {
                   value={customSkill}
                   onChange={(e) => setCustomSkill(e.target.value)}
                   placeholder="Type a skill..."
+                  maxLength={150}
                   className="flex-1 px-3 h-8 rounded-md border bg-accent/5 text-[11px] focus:ring-1 focus:ring-primary/20 outline-none"
                 />
                 <Button type="submit" variant="secondary" size="icon" className="rounded-md h-8 w-8">
@@ -177,17 +201,43 @@ export default function CreateJobPage() {
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Experience</label>
+                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Experience Level <span className="text-destructive">*</span></label>
                 <Select value={experienceLevel} onValueChange={(val: any) => setExperienceLevel(val)}>
                   <SelectTrigger className="w-full px-3 h-10 rounded-md border bg-accent/5 transition-all font-semibold text-xs text-foreground">
                     <SelectValue placeholder="Select Level" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="entry">Entry Level</SelectItem>
+                    <SelectItem value="junior">Junior</SelectItem>
                     <SelectItem value="mid">Mid Level</SelectItem>
-                    <SelectItem value="senior">Senior Level</SelectItem>
-                    <SelectItem value="lead">Lead / Staff</SelectItem>
-                    <SelectItem value="executive">Executive</SelectItem>
+                    <SelectItem value="senior">Senior</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Min Experience (Years) <span className="text-destructive">*</span></label>
+                <input
+                  type="number"
+                  min="0"
+                  value={minExperience}
+                  onChange={(e) => setMinExperience(e.target.value)}
+                  placeholder="e.g. 3"
+                  className="w-full px-3 h-10 rounded-md border bg-accent/5 focus:bg-background transition-all outline-none font-semibold text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Employment Type <span className="text-destructive">*</span></label>
+                <Select value={employmentType} onValueChange={setEmploymentType}>
+                  <SelectTrigger className="w-full px-3 h-10 rounded-md border bg-accent/5 transition-all font-semibold text-xs text-foreground">
+                    <SelectValue placeholder="Select Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full-time">Full-time</SelectItem>
+                    <SelectItem value="part-time">Part-time</SelectItem>
+                    <SelectItem value="contract">Contract</SelectItem>
+                    <SelectItem value="internship">Internship</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -202,6 +252,50 @@ export default function CreateJobPage() {
                   className="w-full px-3 h-10 rounded-md border bg-accent/5 focus:bg-background transition-all outline-none font-semibold text-xs"
                 />
               </div>
+            </div>
+
+            {/* Requirements */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-foreground uppercase tracking-wider">Requirements <span className="text-destructive">*</span></label>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const req = currentRequirement.trim();
+                if (req && !requirements.includes(req) && req.length <= 300) {
+                  setRequirements(prev => [...prev, req]);
+                  setCurrentRequirement("");
+                }
+              }} className="flex gap-1.5">
+                <input 
+                  type="text"
+                  value={currentRequirement}
+                  onChange={(e) => setCurrentRequirement(e.target.value)}
+                  placeholder="Add a requirement..."
+                  maxLength={300}
+                  className="flex-1 px-3 h-8 rounded-md border bg-accent/5 text-[11px] focus:ring-1 focus:ring-primary/20 outline-none"
+                />
+                <Button type="submit" variant="secondary" size="icon" className="rounded-md h-8 w-8">
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </form>
+
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {requirements.map((req, idx) => (
+                  <div key={idx} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-sm text-[10px] font-bold bg-primary border border-primary text-primary-foreground shadow-sm">
+                    <span className="line-clamp-1">{req}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRequirements(prev => prev.filter((_, i) => i !== idx))}
+                      className="opacity-60 hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {requirements.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">{requirements.length} requirement{requirements.length !== 1 ? 's' : ''} added</p>
+              )}
             </div>
           </div>
 
