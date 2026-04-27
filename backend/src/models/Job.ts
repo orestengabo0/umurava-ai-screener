@@ -98,15 +98,15 @@ const JobSchema = new Schema<Job>(
 
     requiredSkills: {
       type: [String],
-      required: true,
+      required: false,
+      default: [],
       validate: {
         validator: (skills: string[]) =>
           Array.isArray(skills) &&
-          skills.length > 0 &&
           skills.every(
-            (s) => typeof s === "string" && s.trim().length > 0 && s.length <= 60
+            (s) => typeof s === "string" && s.trim().length > 0 && s.length <= 150
           ),
-        message: "Each skill must be a non-empty string with max length 60.",
+        message: "Each skill must be a non-empty string with max length 150.",
       },
       set: normalizeStringArray,
     },
@@ -119,9 +119,9 @@ const JobSchema = new Schema<Job>(
         validator: (skills: string[]) =>
           Array.isArray(skills) &&
           skills.every(
-            (s) => typeof s === "string" && s.trim().length > 0 && s.length <= 60
+            (s) => typeof s === "string" && s.trim().length > 0 && s.length <= 150
           ),
-        message: "Each nice-to-have skill must be a non-empty string (max length 60).",
+        message: "Each nice-to-have skill must be a non-empty string (max length 150).",
       },
       set: normalizeStringArray,
     },
