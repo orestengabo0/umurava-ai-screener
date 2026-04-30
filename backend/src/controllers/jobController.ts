@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { JobModel } from "../models/Job.js";
 import type { ExperienceLevel } from "../models/Job.js";
+import { Applicant } from "../models/Applicant.js";
+import { ResumeFileModel } from "../models/ResumeFile.js";
 
 // ─── POST /api/jobs ───────────────────────────────────────────────────────────
 export async function createJob(
@@ -252,14 +254,23 @@ export async function deleteJob(
       return;
     }
 
+    const jobId = req.params["id"];
     const job = await JobModel.findOneAndDelete({
-      _id: req.params["id"],
+      _id: jobId,
       createdBy: req.user.userId,
     }).lean();
+
     if (!job) {
       res.status(404).json({ message: "Job not found" });
       return;
     }
+
+    // Cascade delete: remove all applicants associated with this job
+    await Applicant.deleteMany({ jobId });
+
+    // Cascade delete: remove all resume files associated with this job
+    await ResumeFileModel.deleteMany({ jobId });
+
     res.status(204).send();
   } catch (err) {
     next(err);
