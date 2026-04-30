@@ -59,7 +59,7 @@ interface IApplicant extends Document {
     twitter?: string;
   };
   jobId?: string;
-  uploadedBy?: string;
+  uploadedBy: string;
   uploadedAt: Date;
   fileType: "pdf" | "csv" | "xlsx";
   fileName: string;
@@ -155,7 +155,7 @@ const applicantSchema = new Schema<IApplicant>({
     twitter: String,
   },
   jobId: String,
-  uploadedBy: String,
+  uploadedBy: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
   fileType: {
     type: String,

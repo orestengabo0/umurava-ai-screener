@@ -46,9 +46,6 @@ const settingsSchema = new Schema<ISettings>(
   }
 );
 
-// Index for faster user lookups
-settingsSchema.index({ userId: 1 });
-
 export const SettingsModel =
   (mongoose.models["Settings"] as mongoose.Model<ISettings>) ??
   mongoose.model<ISettings>("Settings", settingsSchema);

@@ -32,6 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getToken } from "@/lib/api/auth";
 
 interface UploadedFile {
@@ -391,15 +397,17 @@ function ApplicantsContent({ setQuotaErrorDialogOpen }: { setQuotaErrorDialogOpe
                 },
               };
             }
+            const errorReason = data?.results?.[0]?.reason || data?.message || "Failed";
+            console.log(`[Frontend] PDF processing failed for ${f.name}:`, errorReason);
             return { 
               ...file, 
               status: "error" as const, 
-              errorMsg: data?.results?.[0]?.reason || "Failed",
+              errorMsg: errorReason,
               processingResults: {
                 downloaded: [],
                 downloadFailed: [],
                 processed: [],
-                processFailed: [{ ok: false, candidate: file.name, error: data?.results?.[0]?.reason || "Failed" }],
+                processFailed: [{ ok: false, candidate: file.name, error: errorReason }],
               },
             };
           })
@@ -537,7 +545,27 @@ function ApplicantsContent({ setQuotaErrorDialogOpen }: { setQuotaErrorDialogOpe
                         {file.status === "validating" && <Loader2 className="w-2.5 h-2.5 animate-spin text-primary" />}
                         {file.status === "valid" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Ready</Badge>}
                         {file.status === "processed" && <Badge className="bg-blue-600/10 text-blue-600 text-[7px] font-bold uppercase rounded-sm px-1 py-0 border-none">Analyzed</Badge>}
-                        {file.status === "error" && <Badge variant="destructive" className="text-[7px] font-bold uppercase rounded-sm px-1 py-0">{file.errorMsg}</Badge>}
+                        {file.status === "error" && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge 
+                                  variant="destructive" 
+                                  className="text-[7px] font-bold uppercase rounded-sm px-1 py-0 cursor-help"
+                                >
+                                  {file.errorMsg}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="whitespace-pre-wrap text-xs">
+                                  {file.processingResults?.processFailed?.map(f => `${f.candidate}: ${f.error}`).join('\n') || 
+                                   file.processingResults?.downloadFailed?.map(f => `${f.email}: ${f.error}`).join('\n') ||
+                                   file.errorMsg}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </div>
                   </div>

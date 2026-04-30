@@ -9,9 +9,9 @@ import { generateJsonFromResumeText } from "../services/gemini.js";
 import { uploadPdfBuffer } from "../services/cloudinary.js";
 
 const MIN_EXTRACTED_TEXT_LENGTH = 300;
-const EXTRACT_CONCURRENCY = 4;
-const AI_CONCURRENCY = 3;
-const PERSIST_CONCURRENCY = 4;
+const EXTRACT_CONCURRENCY = 10;
+const AI_CONCURRENCY = 8;
+const PERSIST_CONCURRENCY = 10;
 
 async function extractTextFromPdf(buffer: Uint8Array): Promise<string> {
   const loadingTask = pdfjsLib.getDocument({ data: buffer });
@@ -124,6 +124,8 @@ export async function ingestResumesProcess(
     const { jobId } = req.params as { jobId: string };
     const files = (req.files as Express.Multer.File[] | undefined) ?? [];
 
+    console.log(`[PDF Processing] Received request for job ${jobId} with ${files.length} files`);
+
     if (!jobId) {
       res.status(400).json({ message: "jobId is required" });
       return;
@@ -133,6 +135,8 @@ export async function ingestResumesProcess(
       res.status(400).json({ message: "No files uploaded" });
       return;
     }
+
+    console.log(`[PDF Processing] Files:`, files.map(f => ({ name: f.originalname, size: f.size, mimetype: f.mimetype })));
 
     const job = await JobModel.findById(jobId).lean();
     if (!job) {
@@ -165,25 +169,40 @@ export async function ingestResumesProcess(
             };
           }
 
-          const modelText = await aiLimit(() =>
-            generateJsonFromResumeText({
-              resumeText,
-              jobContext: {
-                title: job.title,
-                description: job.description,
-                requiredSkills: job.requiredSkills,
-                requirements: job.requirements,
-                experienceLevel: job.experienceLevel,
-                minExperience: job.minExperience,
-                employmentType: job.employmentType,
-                ...(job.location !== undefined ? { location: job.location } : {}),
-                ...(job.educationLevel !== undefined
-                  ? { educationLevel: job.educationLevel }
-                  : {}),
-              },
-              userId: (req as any).user?.userId,
-            })
-          );
+          const modelText = await aiLimit(async () => {
+            try {
+              return await generateJsonFromResumeText({
+                resumeText,
+                jobContext: {
+                  title: job.title,
+                  description: job.description,
+                  requiredSkills: job.requiredSkills,
+                  requirements: job.requirements,
+                  experienceLevel: job.experienceLevel,
+                  minExperience: job.minExperience,
+                  employmentType: job.employmentType,
+                  ...(job.location !== undefined ? { location: job.location } : {}),
+                  ...(job.educationLevel !== undefined
+                    ? { educationLevel: job.educationLevel }
+                    : {}),
+                },
+                userId: (req as any).user?.userId,
+              });
+            } catch (aiError) {
+              const errorMessage = aiError instanceof Error ? aiError.message : 'AI processing failed';
+              
+              // Check for quota exceeded error
+              if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
+                const userRole = (req as any).user?.role;
+                const message = userRole === 'SUPER_ADMIN'
+                  ? 'API quota exceeded. Please update your API key or switch to a different model in Settings.'
+                  : 'API quota exceeded. Please switch to a different model in Settings.';
+                throw new Error(message);
+              }
+              
+              throw aiError;
+            }
+          });
 
           const jsonText = extractFirstJsonObject(modelText);
           const json = JSON.parse(jsonText) as unknown;
@@ -301,6 +320,7 @@ export async function ingestResumesProcess(
                   },
 
                   jobId,
+                  uploadedBy: (req as any).user?.userId,
                   uploadedAt: new Date(),
                   fileType: "pdf",
                   fileName: file.originalname,
@@ -313,7 +333,7 @@ export async function ingestResumesProcess(
               },
               {
                 upsert: true,
-                new: true,
+                returnDocument: 'after',
                 runValidators: true,
                 setDefaultsOnInsert: true,
               }
@@ -449,7 +469,11 @@ export async function ingestResumesParseWithGemini(
               
               // Check for quota exceeded error
               if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
-                throw new Error('API quota exceeded. Please update your API key or switch to a different model in Settings.');
+                const userRole = (req as any).user?.role;
+                const message = userRole === 'SUPER_ADMIN'
+                  ? 'API quota exceeded. Please update your API key or switch to a different model in Settings.'
+                  : 'API quota exceeded. Please switch to a different model in Settings.';
+                throw new Error(message);
               }
               
               throw aiError;
@@ -461,6 +485,8 @@ export async function ingestResumesParseWithGemini(
           const validated = applicantParseSchema.safeParse(json);
 
           if (!validated.success) {
+            const errorDetails = validated.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+            console.error(`[Resume Processing] Schema validation failed for ${file.originalname}:`, errorDetails);
             return {
               ok: false as const,
               stage: "validate" as const,
@@ -468,7 +494,7 @@ export async function ingestResumesParseWithGemini(
               size: file.size,
               mimeType: file.mimetype,
               textLength,
-              reason: "AI output failed schema validation",
+              reason: `AI output failed schema validation: ${errorDetails}`,
               issues: validated.error.issues,
             };
           }
@@ -488,6 +514,8 @@ export async function ingestResumesParseWithGemini(
     const results = settled.map((r, idx) => {
       if (r.status === "fulfilled") return r.value;
       const file = files[idx];
+      const errorReason = r.reason instanceof Error ? r.reason.message : "Processing failed";
+      console.error(`[Resume Processing] Error processing ${file?.originalname}:`, errorReason);
       return {
         ok: false as const,
         stage: "unknown" as const,
@@ -495,7 +523,7 @@ export async function ingestResumesParseWithGemini(
         size: file?.size ?? 0,
         mimeType: file?.mimetype ?? "application/pdf",
         textLength: 0,
-        reason: r.reason instanceof Error ? r.reason.message : "Processing failed",
+        reason: errorReason,
       };
     });
 
@@ -656,7 +684,11 @@ export async function ingestResumesFromCsv(
               
               // Check for quota exceeded error
               if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests')) {
-                throw new Error('API quota exceeded. Please update your API key or switch to a different model in Settings.');
+                const userRole = (req as any).user?.role;
+                const message = userRole === 'SUPER_ADMIN'
+                  ? 'API quota exceeded. Please update your API key or switch to a different model in Settings.'
+                  : 'API quota exceeded. Please switch to a different model in Settings.';
+                throw new Error(message);
               }
               
               throw aiError;
@@ -670,8 +702,9 @@ export async function ingestResumesFromCsv(
             const validated = applicantParseSchema.safeParse(json);
 
             if (!validated.success) {
-              console.error(`[CSV Processing] Schema validation failed for ${candidate.email}:`, validated.error);
-              throw new Error("AI output failed schema validation");
+              const errorDetails = validated.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+              console.error(`[CSV Processing] Schema validation failed for ${candidate.email}:`, errorDetails);
+              throw new Error(`AI output failed schema validation: ${errorDetails}`);
             }
 
             // Check if applicant already exists for this job
@@ -695,6 +728,7 @@ export async function ingestResumesFromCsv(
             const applicant = new Applicant({
               ...validated.data,
               jobId,
+              uploadedBy: userId,
               uploadedAt: new Date(),
               fileType: "pdf",
               fileName: `${candidate.firstName}_${candidate.lastName}_resume.pdf`,

@@ -59,6 +59,7 @@ export async function updateSettingsHandler(
 ): Promise<void> {
   try {
     const userId = (req as any).user?.userId;
+    const userRole = (req as any).user?.role;
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
       return;
@@ -75,7 +76,15 @@ export async function updateSettingsHandler(
 
     const { geminiApiKey, geminiModel } = validationResult.data;
 
-    // If API key is provided, validate it's not masked
+    // Only SUPER_ADMIN can update the API key
+    if (geminiApiKey && userRole !== "SUPER_ADMIN") {
+      res.status(403).json({ 
+        message: "Only SUPER_ADMIN can update the API key. You can only change your model preference." 
+      });
+      return;
+    }
+
+    // If API key is provided (by SUPER_ADMIN), validate it's not masked
     if (geminiApiKey) {
       // Reject masked keys (containing bullet points)
       if (geminiApiKey.includes("•")) {
@@ -93,6 +102,31 @@ export async function updateSettingsHandler(
       if (existingSettings && existingSettings.geminiApiKey) {
         finalApiKey = existingSettings.geminiApiKey;
       } else {
+        // For non-SUPER_ADMIN users without an existing key, they need to use the system key
+        // They can only update their model preference
+        if (userRole !== "SUPER_ADMIN") {
+          // Save only the model preference without an API key
+          const settings = await SettingsModel.findOneAndUpdate(
+            { userId },
+            {
+              geminiModel,
+              isActive: true,
+              lastTestedAt: undefined,
+              lastTestSuccess: undefined,
+            },
+            { upsert: true, returnDocument: 'after', runValidators: true }
+          );
+
+          res.json({
+            geminiApiKey: "",
+            geminiModel: settings.geminiModel,
+            isActive: settings.isActive,
+            lastTestedAt: settings.lastTestedAt,
+            lastTestSuccess: settings.lastTestSuccess,
+          });
+          return;
+        }
+        
         res.status(400).json({ 
           message: "API key is required when no existing key found." 
         });
@@ -109,7 +143,7 @@ export async function updateSettingsHandler(
         lastTestedAt: undefined,
         lastTestSuccess: undefined,
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
     // Return masked API key
@@ -176,7 +210,7 @@ export async function testSettingsHandler(
           lastTestedAt: new Date(),
           lastTestSuccess: true,
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
 
       res.json({
@@ -194,7 +228,7 @@ export async function testSettingsHandler(
           lastTestedAt: new Date(),
           lastTestSuccess: false,
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -259,7 +293,7 @@ export async function testStoredSettingsHandler(
           lastTestedAt: new Date(),
           lastTestSuccess: true,
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       res.json({
@@ -274,7 +308,7 @@ export async function testStoredSettingsHandler(
           lastTestedAt: new Date(),
           lastTestSuccess: false,
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";

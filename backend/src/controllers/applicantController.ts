@@ -7,6 +7,10 @@ import { getGeminiClientForUser } from "../services/gemini.js";
 
 export const uploadApplicants = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
@@ -45,6 +49,7 @@ export const uploadApplicants = async (req: Request, res: Response) => {
         type: "Full-time",
       },
       jobId,
+      uploadedBy: req.user.userId,
       uploadedAt: new Date(),
       fileType,
       fileName: req.file.originalname,
@@ -65,8 +70,12 @@ export const uploadApplicants = async (req: Request, res: Response) => {
 
 export const getApplicants = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     const { jobId } = req.query;
-    const query = jobId ? { jobId } : {};
+    const query = jobId ? { jobId, uploadedBy: req.user.userId } : { uploadedBy: req.user.userId };
 
     const applicants = await Applicant.find(query).sort({ uploadedAt: -1 });
 
@@ -83,13 +92,20 @@ export const getApplicants = async (req: Request, res: Response) => {
 
 export const getApplicantById = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
       return res.status(400).json({ message: "Applicant id is required" });
     }
 
-    const applicant = await Applicant.findById(id).lean();
+    const applicant = await Applicant.findOne({
+      _id: id,
+      uploadedBy: req.user.userId,
+    }).lean();
 
     if (!applicant) {
       return res.status(404).json({ message: "Applicant not found" });
@@ -112,6 +128,10 @@ export const getApplicantById = async (req: Request, res: Response) => {
 
 export const deleteApplicant = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     const { id } = req.params;
 
     if (typeof id !== "string" || !id) {
@@ -124,16 +144,20 @@ export const deleteApplicant = async (req: Request, res: Response) => {
 
     const applicantObjectId = new Types.ObjectId(id);
 
-    const resumeFiles = await ResumeFileModel.find({
-      applicantId: applicantObjectId,
-    }).lean();
-
-    const applicant = await Applicant.findByIdAndDelete(id);
+    const applicant = await Applicant.findOne({
+      _id: id,
+      uploadedBy: req.user.userId,
+    });
 
     if (!applicant) {
       return res.status(404).json({ message: "Applicant not found" });
     }
 
+    const resumeFiles = await ResumeFileModel.find({
+      applicantId: applicantObjectId,
+    }).lean();
+
+    await Applicant.findByIdAndDelete(id);
     await ResumeFileModel.deleteMany({ applicantId: applicantObjectId });
 
     await Promise.allSettled(
@@ -206,13 +230,20 @@ export const chatWithApplicant = async (req: Request, res: Response) => {
 
 export const deleteJobApplicants = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
     const { jobId } = req.params;
 
     if (!jobId) {
       return res.status(400).json({ message: "Job ID is required" });
     }
 
-    const applicants = await Applicant.find({ jobId }).lean();
+    const applicants = await Applicant.find({
+      jobId,
+      uploadedBy: req.user.userId,
+    }).lean();
     const applicantIds = applicants.map(a => a._id);
 
     const resumeFiles = await ResumeFileModel.find({
@@ -226,7 +257,7 @@ export const deleteJobApplicants = async (req: Request, res: Response) => {
 
     // Delete from DB
     await ResumeFileModel.deleteMany({ applicantId: { $in: applicantIds } });
-    await Applicant.deleteMany({ jobId });
+    await Applicant.deleteMany({ jobId, uploadedBy: req.user.userId });
 
     res.status(200).json({
       message: "All applicants for the job deleted successfully",

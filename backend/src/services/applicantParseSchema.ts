@@ -52,20 +52,20 @@ const availabilityTypeSchema = z
 
 export const applicantParseSchema = z
   .object({
-    isResume: z.boolean().default(true),
-    "First Name": z.string().nullable().transform(v => v ?? "Unknown").default("Unknown"),
-    "Last Name": z.string().nullable().transform(v => v ?? "Applicant").default("Applicant"),
-    "Email": z.string().email().or(z.string().transform(() => "unknown@example.com")),
-    "Headline": z.string().nullable().transform(v => v ?? "Professional").default("Professional"),
+    isResume: z.boolean().refine(val => val === true, { message: "Document is not a valid resume" }),
+    "First Name": z.string().min(1, "First Name is required").refine(val => val !== "Unknown" && val !== "N/A", { message: "First Name cannot be N/A or Unknown" }),
+    "Last Name": z.string().min(1, "Last Name is required").refine(val => val !== "Applicant" && val !== "N/A", { message: "Last Name cannot be N/A or Applicant" }),
+    "Email": z.string().email("Invalid email format").refine(val => !val.includes("unknown") && !val.includes("example.com"), { message: "Email cannot be a placeholder" }),
+    "Headline": z.string().min(5, "Headline must be at least 5 characters").refine(val => val !== "Professional" && val !== "N/A", { message: "Headline cannot be a placeholder" }),
     "Bio": z.string().nullable().default(null),
-    "Location": z.string().nullable().transform(v => v ?? "Remote").default("Remote"),
+    "Location": z.string().min(2, "Location is required").refine(val => val !== "Remote" && val !== "N/A", { message: "Location cannot be a placeholder" }),
     "Phone": z.string().nullable().default(null),
 
     skills: z.array(z.object({
-      name: z.string().nullable().transform(v => v ?? "Skill"),
+      name: z.string().min(1, "Skill name is required").refine(val => val !== "Skill" && val !== "N/A", { message: "Skill name cannot be a placeholder" }),
       level: skillLevelSchema,
       yearsOfExperience: z.preprocess((val) => (typeof val === 'string' ? parseInt(val) : val), z.number().nullable().default(null))
-    })).default([]),
+    })).min(1, "At least one skill is required").refine(skills => skills.length > 0, { message: "Skills array cannot be empty" }),
 
     languages: z.array(z.object({
       name: z.string().nullable().transform(v => v ?? "Language"),
@@ -73,22 +73,22 @@ export const applicantParseSchema = z
     })).default([]),
 
     experience: z.array(z.object({
-      company: z.string().nullable().transform(v => v ?? "Unknown"),
-      role: z.string().nullable().transform(v => v ?? "Experience"),
-      "Start Date": z. string().nullable().default(""),
+      company: z.string().min(1, "Company name is required").refine(val => val !== "Unknown" && val !== "N/A", { message: "Company name cannot be a placeholder" }),
+      role: z.string().min(1, "Role is required").refine(val => val !== "Experience" && val !== "N/A", { message: "Role cannot be a placeholder" }),
+      "Start Date": z.string().nullable().default(""),
       "End Date": z.string().nullable().default(""),
       description: z.string().nullable().default(null),
       technologies: z.array(z.string()).default([]),
       "Is Current": z.boolean().nullable().default(null)
-    })).default([]),
+    })).min(1, "At least one work experience is required").refine(exp => exp.length > 0, { message: "Experience array cannot be empty" }),
 
     education: z.array(z.object({
-      institution: z.string().nullable().transform(v => v ?? "University"),
-      degree: z.string().nullable().transform(v => v ?? "Degree"),
+      institution: z.string().min(1, "Institution is required").refine(val => val !== "University" && val !== "N/A", { message: "Institution cannot be a placeholder" }),
+      degree: z.string().min(1, "Degree is required").refine(val => val !== "Degree" && val !== "N/A", { message: "Degree cannot be a placeholder" }),
       "Field of Study": z.string().nullable().default(null),
       "Start Year": z.preprocess((val) => (typeof val === 'string' ? parseInt(val) : val), z.number().int().nullable().default(null)),
       "End Year": z.preprocess((val) => (typeof val === 'string' ? parseInt(val) : val), z.number().int().nullable().default(null))
-    })).default([]),
+    })).min(1, "At least one education entry is required").refine(edu => edu.length > 0, { message: "Education array cannot be empty" }),
 
     certifications: z.array(z.object({
       name: z.string().nullable().transform(v => v ?? "Cert"),
@@ -97,14 +97,14 @@ export const applicantParseSchema = z
     })).default([]),
 
     projects: z.array(z.object({
-      name: z.string().nullable().transform(v => v ?? "Project"),
+      name: z.string().min(1, "Project name is required").refine(val => val !== "Project" && val !== "N/A", { message: "Project name cannot be a placeholder" }),
       description: z.string().nullable().default(null),
       technologies: z.array(z.string()).default([]),
       role: z.string().nullable().default(null),
       link: z.string().nullable().default(null),
       "Start Date": z.string().nullable().default(null),
       "End Date": z.string().nullable().default(null)
-    })).default([]),
+    })).min(1, "At least one project is required").refine(proj => proj.length > 0, { message: "Projects array cannot be empty" }),
 
     availability: z.object({
       status: availabilityStatusSchema,

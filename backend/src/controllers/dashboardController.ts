@@ -4,12 +4,18 @@ import { Applicant } from "../models/Applicant.js";
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
-    const totalJobs = await JobModel.countDocuments();
-    const openJobs = await JobModel.countDocuments({ status: "open" });
-    const totalApplicants = await Applicant.countDocuments();
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const totalJobs = await JobModel.countDocuments({ createdBy: userId });
+    const openJobs = await JobModel.countDocuments({ status: "open", createdBy: userId });
+    const totalApplicants = await Applicant.countDocuments({ uploadedBy: userId });
     
     // Recent activity: last 5 applicants
-    const recentApplicants = await Applicant.find()
+    const recentApplicants = await Applicant.find({ uploadedBy: userId })
       .sort({ uploadedAt: -1 })
       .limit(5)
       .lean();
@@ -19,7 +25,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
     const activityData = await Applicant.aggregate([
-      { $match: { uploadedAt: { $gte: sevenDaysAgo } } },
+      { $match: { uploadedAt: { $gte: sevenDaysAgo }, uploadedBy: userId } },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$uploadedAt" } },

@@ -9,6 +9,11 @@ export async function createJob(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
     const { title, description, requiredSkills, experienceLevel, minExperience, employmentType, requirements, location } =
       req.body as {
         title?: string;
@@ -54,6 +59,7 @@ export async function createJob(
       minExperience,
       employmentType,
       requirements,
+      createdBy: req.user.userId,
     };
     if (location) jobData.location = location;
 
@@ -72,6 +78,11 @@ export async function getJobs(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
     const { status, search, page = "1", limit = "10" } = req.query as {
       status?: string;
       search?: string;
@@ -83,7 +94,9 @@ export async function getJobs(
     const l = parseInt(limit);
     const skip = (p - 1) * l;
 
-    const filter: Record<string, any> = {};
+    const filter: Record<string, any> = {
+      createdBy: req.user.userId,
+    };
     if (status === "open" || status === "closed") {
       filter["status"] = status;
     }
@@ -120,7 +133,15 @@ export async function getJobById(
   next: NextFunction
 ): Promise<void> {
   try {
-    const job = await JobModel.findById(req.params["id"]).lean();
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
+    const job = await JobModel.findOne({
+      _id: req.params["id"],
+      createdBy: req.user.userId,
+    }).lean();
     if (!job) {
       res.status(404).json({ message: "Job not found" });
       return;
@@ -138,6 +159,11 @@ export async function setJobStatus(
   next: NextFunction
 ): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
     const { status } = req.body as { status?: "open" | "closed" };
     if (status !== "open" && status !== "closed") {
       res
@@ -146,10 +172,10 @@ export async function setJobStatus(
       return;
     }
 
-    const job = await JobModel.findByIdAndUpdate(
-      req.params["id"],
+    const job = await JobModel.findOneAndUpdate(
+      { _id: req.params["id"], createdBy: req.user.userId },
       { status },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).lean();
 
     if (!job) {
@@ -170,12 +196,20 @@ export async function updateJob(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { title, description, requiredSkills, experienceLevel, location } =
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
+    const { title, description, requiredSkills, experienceLevel, minExperience, employmentType, requirements, location } =
       req.body as {
         title?: string;
         description?: string;
         requiredSkills?: string[];
         experienceLevel?: ExperienceLevel;
+        minExperience?: number;
+        employmentType?: string;
+        requirements?: string[];
         location?: string;
       };
 
@@ -184,12 +218,15 @@ export async function updateJob(
     if (description) updateData.description = description;
     if (requiredSkills) updateData.requiredSkills = requiredSkills;
     if (experienceLevel) updateData.experienceLevel = experienceLevel;
+    if (minExperience !== undefined) updateData.minExperience = minExperience;
+    if (employmentType) updateData.employmentType = employmentType;
+    if (requirements) updateData.requirements = requirements;
     if (location !== undefined) updateData.location = location;
 
-    const job = await JobModel.findByIdAndUpdate(
-      req.params["id"],
+    const job = await JobModel.findOneAndUpdate(
+      { _id: req.params["id"], createdBy: req.user.userId },
       updateData,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).lean();
 
     if (!job) {
@@ -210,7 +247,15 @@ export async function deleteJob(
   next: NextFunction
 ): Promise<void> {
   try {
-    const job = await JobModel.findByIdAndDelete(req.params["id"]).lean();
+    if (!req.user) {
+      res.status(401).json({ message: "Not authenticated" });
+      return;
+    }
+
+    const job = await JobModel.findOneAndDelete({
+      _id: req.params["id"],
+      createdBy: req.user.userId,
+    }).lean();
     if (!job) {
       res.status(404).json({ message: "Job not found" });
       return;

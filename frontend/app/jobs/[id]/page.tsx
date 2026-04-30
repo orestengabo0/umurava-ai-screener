@@ -96,6 +96,10 @@ export default function JobDetailPage() {
       location: job.location || "",
       description: job.description,
       requiredSkills: job.requiredSkills || [],
+      experienceLevel: job.experienceLevel,
+      minExperience: job.minExperience,
+      employmentType: job.employmentType,
+      requirements: job.requirements || [],
     });
     setIsEditing(true);
   };
@@ -189,6 +193,23 @@ export default function JobDetailPage() {
                       )}
                     </span>
                     <span className="flex items-center gap-1.5 border-l pl-4">
+                      <Briefcase className="w-3 h-3 text-primary" />
+                      {isEditing ? (
+                        <select
+                          value={editForm.employmentType || ""}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, employmentType: e.target.value as any }))}
+                          className="border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50 text-[10px]"
+                        >
+                          <option value="full-time">Full-time</option>
+                          <option value="part-time">Part-time</option>
+                          <option value="contract">Contract</option>
+                          <option value="internship">Internship</option>
+                        </select>
+                      ) : (
+                        <span className="capitalize">{job.employmentType}</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-1.5 border-l pl-4">
                       <Calendar className="w-3 h-3 text-primary" /> {fmt(job.createdAt)}
                     </span>
                   </div>
@@ -222,6 +243,108 @@ export default function JobDetailPage() {
                      {job.description}
                    </p>
                 )}
+              </div>
+
+              {/* Requirements */}
+              {(job.requirements?.length > 0 || isEditing) && (
+                <div className="mt-8 pt-6 border-t space-y-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Target className="w-3 h-3" /> Requirements
+                  </h3>
+                  <ul className="space-y-1 pt-1">
+                    {(isEditing ? editForm.requirements || [] : job.requirements).map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-xs text-foreground">
+                        <span className="text-primary mt-0.5">•</span>
+                        {isEditing ? (
+                          <input
+                            value={req}
+                            onChange={(e) => {
+                              const newReqs = [...(editForm.requirements || [])];
+                              newReqs[idx] = e.target.value;
+                              setEditForm(prev => ({ ...prev, requirements: newReqs }));
+                            }}
+                            className="flex-1 border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                        ) : (
+                          <span>{req}</span>
+                        )}
+                        {isEditing && (
+                          <X 
+                            className="w-3 h-3 cursor-pointer hover:text-destructive opacity-70 hover:opacity-100 mt-0.5" 
+                            onClick={() => setEditForm(prev => ({ ...prev, requirements: prev.requirements?.filter((_, i) => i !== idx) }))} 
+                          />
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {isEditing && (
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="mt-2 h-8 text-[10px] font-bold rounded-md px-3"
+                      onClick={() => setEditForm(prev => ({ ...prev, requirements: [...(prev.requirements || []), ""] }))}
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Requirement
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Experience & Employment */}
+              <div className="mt-8 pt-6 border-t space-y-2">
+                <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Briefcase className="w-3 h-3" /> Job Details
+                </h3>
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Experience Level</p>
+                    {isEditing ? (
+                      <select
+                        value={editForm.experienceLevel || ""}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, experienceLevel: e.target.value as any }))}
+                        className="w-full border rounded-md px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      >
+                        <option value="junior">Junior</option>
+                        <option value="mid">Mid</option>
+                        <option value="senior">Senior</option>
+                        <option value="lead">Lead</option>
+                      </select>
+                    ) : (
+                      <p className="text-xs font-medium capitalize">{job.experienceLevel}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Min Experience</p>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editForm.minExperience || 0}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, minExperience: parseInt(e.target.value) || 0 }))}
+                        className="w-full border rounded-md px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                        min="0"
+                      />
+                    ) : (
+                      <p className="text-xs font-medium">{job.minExperience} years</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Employment Type</p>
+                    {isEditing ? (
+                      <select
+                        value={editForm.employmentType || ""}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, employmentType: e.target.value as any }))}
+                        className="w-full border rounded-md px-2 py-1.5 text-xs bg-background focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      >
+                        <option value="full-time">Full-time</option>
+                        <option value="part-time">Part-time</option>
+                        <option value="contract">Contract</option>
+                        <option value="internship">Internship</option>
+                      </select>
+                    ) : (
+                      <p className="text-xs font-medium capitalize">{job.employmentType}</p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {(job.requiredSkills?.length > 0 || isEditing) && (

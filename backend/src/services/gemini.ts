@@ -18,6 +18,7 @@ export async function getGeminiClientForUser(userId: string): Promise<{ client: 
   // Try to get user's settings from database
   const settings = await SettingsModel.findOne({ userId, isActive: true });
   
+  // If user has their own API key (SUPER_ADMIN only), use it
   if (settings && settings.geminiApiKey) {
     return {
       client: new GoogleGenerativeAI(settings.geminiApiKey),
@@ -25,15 +26,35 @@ export async function getGeminiClientForUser(userId: string): Promise<{ client: 
     };
   }
   
-  // Fallback to environment variable
+  // Otherwise, use the SUPER_ADMIN's API key from settings
+  // Find any SUPER_ADMIN with an active API key
+  const { UserModel } = await import("../models/User.js");
+  const superAdmin = await UserModel.findOne({ role: "SUPER_ADMIN" });
+  
+  if (superAdmin) {
+    const adminSettings = await SettingsModel.findOne({ userId: superAdmin._id.toString(), isActive: true });
+    if (adminSettings && adminSettings.geminiApiKey) {
+      // Use SUPER_ADMIN's API key with user's model preference
+      const model = settings?.geminiModel || adminSettings.geminiModel || "gemini-2.5-flash-lite";
+      return {
+        client: new GoogleGenerativeAI(adminSettings.geminiApiKey),
+        model,
+      };
+    }
+  }
+  
+  // Final fallback to environment variable if no SUPER_ADMIN key exists
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("No Gemini API key configured. Please add your API key in Settings.");
+    throw new Error("No Gemini API key configured. Please contact your administrator to set up the API key in Settings.");
   }
+  
+  // Use the user's model preference if available, otherwise default
+  const model = settings?.geminiModel || "gemini-2.5-flash-lite";
   
   return {
     client: new GoogleGenerativeAI(apiKey),
-    model: "gemini-2.5-flash-lite",
+    model,
   };
 }
 

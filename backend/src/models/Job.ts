@@ -35,7 +35,7 @@ export interface Job {
 
   status: JobStatus; // open by default
 
-  createdBy?: Types.ObjectId; // optional: if you want ownership
+  createdBy: Types.ObjectId; // required for ownership
   createdAt: Date;
   updatedAt: Date;
 }
@@ -163,7 +163,7 @@ const JobSchema = new Schema<Job>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: false,
+      required: true,
       index: true,
     },
   },

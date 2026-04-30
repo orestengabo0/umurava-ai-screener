@@ -1,10 +1,13 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
+export type UserRole = "RECRUITER" | "SUPER_ADMIN";
+
 export interface IUser extends Document {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
+  role: UserRole;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   createdAt: Date;
@@ -36,6 +39,12 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
       minlength: 6,
+    },
+    role: {
+      type: String,
+      enum: ["RECRUITER", "SUPER_ADMIN"],
+      default: "RECRUITER",
+      required: true,
     },
     resetPasswordToken: {
       type: String,

@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AppLayout } from "@/components/AppLayout";
 import { getSettings, updateSettings, testSettings, testStoredSettings, deleteSettings, type Settings } from "@/lib/api/settings";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, Shield } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -29,6 +31,8 @@ export default function SettingsPage() {
     geminiModel: "gemini-2.5-flash-lite",
   });
   const [hasModelChanged, setHasModelChanged] = useState(false);
+
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   useEffect(() => {
     loadSettings();
@@ -55,8 +59,8 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Only send API key if it's a new one (not empty and not masked)
-      const dataToSend = formData.geminiApiKey && !formData.geminiApiKey.includes("•")
+      // Only send API key if it's a new one (not empty and not masked) and user is SUPER_ADMIN
+      const dataToSend = isSuperAdmin && formData.geminiApiKey && !formData.geminiApiKey.includes("•")
         ? formData 
         : { geminiModel: formData.geminiModel };
       
@@ -154,46 +158,54 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Gemini API Configuration</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-primary" />
+              Gemini API Configuration
+            </CardTitle>
             <CardDescription>
-              Enter your Google Gemini API key to enable AI-powered resume screening
+              {isSuperAdmin 
+                ? "Manage the system-wide Gemini API key and your model preferences"
+                : "Configure your Gemini model preferences for AI-powered resume screening"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* API Key Input */}
-            <div className="space-y-2">
-              <label htmlFor="apiKey" className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                API Key
-              </label>
-              <div className="relative">
-                <Input
-                  id="apiKey"
-                  type={showApiKey ? "text" : "password"}
-                  placeholder={settings.geminiApiKey ? "API key is saved (enter new key to update)" : "Enter your Gemini API key"}
-                  value={formData.geminiApiKey}
-                  onChange={(e) => setFormData({ ...formData, geminiApiKey: e.target.value })}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {/* API Key Input - Only for SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <label htmlFor="apiKey" className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                  API Key
+                </label>
+                <div className="relative">
+                  <Input
+                    id="apiKey"
+                    type={showApiKey ? "text" : "password"}
+                    placeholder={settings.geminiApiKey ? "API key is saved (enter new key to update)" : "Enter your Gemini API key"}
+                    value={formData.geminiApiKey}
+                    onChange={(e) => setFormData({ ...formData, geminiApiKey: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from{" "}
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Google AI Studio
+                  </a>
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Get your API key from{" "}
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Google AI Studio
-                </a>
-              </p>
-            </div>
+            )}
 
             {/* Model Selection */}
             <div className="space-y-2">
@@ -219,7 +231,10 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Select the Gemini model to use for AI processing
+                {isSuperAdmin 
+                  ? "Select the Gemini model to use for AI processing (affects all users)"
+                  : "Select the Gemini model to use for your AI processing"
+                }
               </p>
             </div>
 
@@ -246,7 +261,7 @@ export default function SettingsPage() {
             <div className="flex gap-3 pt-4">
               <Button
                 onClick={handleSave}
-                disabled={isSaving || (!formData.geminiApiKey && !hasModelChanged)}
+                disabled={isSaving || (!isSuperAdmin && !hasModelChanged)}
                 className="flex-1"
               >
                 {isSaving ? (
@@ -258,24 +273,26 @@ export default function SettingsPage() {
                   "Save Settings"
                 )}
               </Button>
-              <Button
-                onClick={handleTest}
-                disabled={isTesting || !settings.geminiApiKey}
-                variant="outline"
-                className="flex-1"
-              >
-                {isTesting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Testing...
-                  </>
-                ) : (
-                  "Test Saved Key"
-                )}
-              </Button>
+              {isSuperAdmin && (
+                <Button
+                  onClick={handleTest}
+                  disabled={isTesting || !settings.geminiApiKey}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  {isTesting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Testing...
+                    </>
+                  ) : (
+                    "Test Saved Key"
+                  )}
+                </Button>
+              )}
             </div>
 
-            {settings.geminiApiKey && (
+            {isSuperAdmin && settings.geminiApiKey && (
               <Button
                 onClick={handleDelete}
                 variant="ghost"

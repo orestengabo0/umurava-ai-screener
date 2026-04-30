@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { UserModel, type IUser } from "../models/User.js";
+import { UserModel, type IUser, type UserRole } from "../models/User.js";
 import { sendPasswordResetEmail } from "./email.js";
 
 const SALT_ROUNDS = 10;
@@ -26,6 +26,7 @@ export interface AuthResponse {
     firstName: string;
     lastName: string;
     email: string;
+    role: UserRole;
   };
   token: string;
 }
@@ -41,12 +42,12 @@ export async function comparePassword(
   return bcrypt.compare(password, hashedPassword);
 }
 
-export function generateToken(userId: string, email: string): string {
+export function generateToken(userId: string, email: string, role: string): string {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error("JWT_SECRET not configured");
   }
-  return jwt.sign({ userId, email }, jwtSecret, {
+  return jwt.sign({ userId, email, role }, jwtSecret, {
     expiresIn: JWT_EXPIRES_IN,
   });
 }
@@ -69,16 +70,17 @@ export async function registerUser(
   // Hash password
   const hashedPassword = await hashPassword(password);
 
-  // Create user
+  // Create user with default role RECRUITER
   const user = await UserModel.create({
     firstName,
     lastName,
     email,
     password: hashedPassword,
+    role: "RECRUITER",
   });
 
   // Generate token
-  const token = generateToken(user._id.toString(), user.email);
+  const token = generateToken(user._id.toString(), user.email, user.role);
 
   return {
     user: {
@@ -86,6 +88,7 @@ export async function registerUser(
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      role: user.role,
     },
     token,
   };
@@ -107,7 +110,7 @@ export async function loginUser(data: LoginData): Promise<AuthResponse> {
   }
 
   // Generate token
-  const token = generateToken(user._id.toString(), user.email);
+  const token = generateToken(user._id.toString(), user.email, user.role);
 
   return {
     user: {
@@ -115,6 +118,7 @@ export async function loginUser(data: LoginData): Promise<AuthResponse> {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      role: user.role,
     },
     token,
   };
