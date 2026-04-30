@@ -262,62 +262,133 @@ export async function testStoredSettingsHandler(
 ): Promise<void> {
   try {
     const userId = (req as any).user?.userId;
+    const userRole = (req as any).user?.role;
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
       return;
     }
 
-    // Get user's current settings from database
-    const settings = await SettingsModel.findOne({ userId });
-    
-    if (!settings || !settings.geminiApiKey) {
-      res.status(400).json({
-        success: false,
-        message: "No API key found. Please save your API key first.",
-      });
-      return;
+    let apiKey: string | null = null;
+    let model: string = "gemini-2.5-flash-lite";
+
+    // If user is SUPER_ADMIN, use their own stored key
+    if (userRole === "SUPER_ADMIN") {
+      const settings = await SettingsModel.findOne({ userId });
+      if (!settings || !settings.geminiApiKey) {
+        res.status(400).json({
+          success: false,
+          message: "No API key found. Please save your API key first.",
+        });
+        return;
+      }
+      apiKey = settings.geminiApiKey;
+      model = settings.geminiModel || "gemini-2.5-flash-lite";
+    } else {
+      // For RECRUITERs, use the SUPER_ADMIN's API key
+      const { UserModel } = await import("../models/User.js");
+      const superAdmin = await UserModel.findOne({ role: "SUPER_ADMIN" });
+      
+      if (superAdmin) {
+        const adminSettings = await SettingsModel.findOne({ userId: superAdmin._id.toString(), isActive: true });
+        if (adminSettings && adminSettings.geminiApiKey) {
+          apiKey = adminSettings.geminiApiKey;
+          model = adminSettings.geminiModel || "gemini-2.5-flash-lite";
+        }
+      }
+      
+      // If no SUPER_ADMIN key, try environment variable
+      if (!apiKey) {
+        apiKey = process.env.GEMINI_API_KEY || null;
+      }
+      
+      if (!apiKey) {
+        res.status(400).json({
+          success: false,
+          message: "No API key configured. Please contact your administrator to set up the API key.",
+        });
+        return;
+      }
     }
 
-    // Test the stored API key
-    const genAI = new GoogleGenerativeAI(settings.geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: settings.geminiModel || "gemini-2.5-flash-lite" });
+    // Test the API key
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const geminiModel = genAI.getGenerativeModel({ model });
 
     try {
-      const result = await model.generateContent("Hello");
+      const result = await geminiModel.generateContent("Hello");
       const text = result.response.text();
 
-      // Update settings with test result
-      await SettingsModel.findOneAndUpdate(
-        { userId },
-        {
-          lastTestedAt: new Date(),
-          lastTestSuccess: true,
-        },
-        { returnDocument: 'after' }
-      );
+      // Update user's settings with test result (for SUPER_ADMIN) or just model preference (for RECRUITER)
+      if (userRole === "SUPER_ADMIN") {
+        await SettingsModel.findOneAndUpdate(
+          { userId },
+          {
+            lastTestedAt: new Date(),
+            lastTestSuccess: true,
+          },
+          { returnDocument: 'after' }
+        );
+      } else {
+        // For RECRUITERs, update their model preference and test status
+        const userSettings = await SettingsModel.findOne({ userId });
+        if (userSettings) {
+          await SettingsModel.findOneAndUpdate(
+            { userId },
+            {
+              geminiModel: model,
+              lastTestedAt: new Date(),
+              lastTestSuccess: true,
+            },
+            { returnDocument: 'after' }
+          );
+        } else {
+          // Create settings for RECRUITER with model preference
+          await SettingsModel.create({
+            userId,
+            geminiModel: model,
+            isActive: true,
+            lastTestedAt: new Date(),
+            lastTestSuccess: true,
+          });
+        }
+      }
 
       res.json({
         success: true,
-        message: "API key is valid and working",
+        message: "API configuration is working",
       });
     } catch (error) {
       // Update settings with failed test result
-      await SettingsModel.findOneAndUpdate(
-        { userId },
-        {
-          lastTestedAt: new Date(),
-          lastTestSuccess: false,
-        },
-        { returnDocument: 'after' }
-      );
+      if (userRole === "SUPER_ADMIN") {
+        await SettingsModel.findOneAndUpdate(
+          { userId },
+          {
+            lastTestedAt: new Date(),
+            lastTestSuccess: false,
+          },
+          { returnDocument: 'after' }
+        );
+      } else {
+        const userSettings = await SettingsModel.findOne({ userId });
+        if (userSettings) {
+          await SettingsModel.findOneAndUpdate(
+            { userId },
+            {
+              lastTestedAt: new Date(),
+              lastTestSuccess: false,
+            },
+            { returnDocument: 'after' }
+          );
+        }
+      }
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
+
       // Check for quota exceeded error
       if (errorMessage.includes("quota") || errorMessage.includes("limit") || errorMessage.includes("429")) {
         res.status(429).json({
           success: false,
-          message: "API quota exceeded",
+          message: "API quota exceeded. Please contact your administrator to update the API key.",
           error: errorMessage,
         });
         return;

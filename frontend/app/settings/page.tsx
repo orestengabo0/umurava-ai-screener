@@ -273,23 +273,21 @@ export default function SettingsPage() {
                   "Save Settings"
                 )}
               </Button>
-              {isSuperAdmin && (
-                <Button
-                  onClick={handleTest}
-                  disabled={isTesting || !settings.geminiApiKey}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  {isTesting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Testing...
-                    </>
-                  ) : (
-                    "Test Saved Key"
-                  )}
-                </Button>
-              )}
+              <Button
+                onClick={handleTest}
+                disabled={isTesting}
+                variant="outline"
+                className="flex-1"
+              >
+                {isTesting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  "Test Configuration"
+                )}
+              </Button>
             </div>
 
             {isSuperAdmin && settings.geminiApiKey && (
