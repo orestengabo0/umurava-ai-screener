@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getGeminiClientForUser } from "../services/gemini.ts";
+import { getGeminiClientForUser } from "../services/gemini.js";
 
 function extractJson(raw: string): string {
   // Strip markdown fences

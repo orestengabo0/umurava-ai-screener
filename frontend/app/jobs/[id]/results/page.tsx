@@ -96,7 +96,7 @@ export default function JobResultsPage() {
 
     try {
       const token = getToken();
-      const res = await axios.post(`${API_BASE_URL}/jobs/${jobId}/chat-results`, { 
+      const res = await axios.post(`${API_BASE_URL}/api/jobs/${jobId}/chat-results`, { 
         message: msg,
         context: applicants.map(a => ({
           name: `${a.firstName} ${a.lastName}`,

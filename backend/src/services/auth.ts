@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { UserModel, type IUser } from "../models/User.ts";
-import { sendPasswordResetEmail } from "./email.ts";
+import { UserModel, type IUser } from "../models/User.js";
+import { sendPasswordResetEmail } from "./email.js";
 
 const SALT_ROUNDS = 10;
 const JWT_EXPIRES_IN = "7d";

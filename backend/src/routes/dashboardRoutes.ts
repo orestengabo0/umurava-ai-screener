@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { getDashboardStats } from "../controllers/dashboardController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+import { getDashboardStats } from "../controllers/dashboardController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 

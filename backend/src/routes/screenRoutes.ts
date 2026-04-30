@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { screenApplicantsHandler } from "../controllers/screenController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+import { screenApplicantsHandler } from "../controllers/screenController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 

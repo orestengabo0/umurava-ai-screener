@@ -7,8 +7,8 @@ import {
   deleteApplicant,
   chatWithApplicant,
   deleteJobApplicants,
-} from "../controllers/applicantController.ts";
-import { authenticateToken } from "../middleware/auth.ts";
+} from "../controllers/applicantController.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = Router();
 

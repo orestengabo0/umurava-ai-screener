@@ -7,7 +7,7 @@ import {
   resetPassword,
   type RegisterData,
   type LoginData,
-} from "../services/auth.ts";
+} from "../services/auth.js";
 
 // Validation schemas
 const registerSchema = z.object({
