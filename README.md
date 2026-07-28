@@ -1,4 +1,3 @@
-"# Umurava AI Screener
 
 An intelligent AI-powered resume screening and applicant management system that leverages Google's Gemini AI to automate the candidate evaluation process. The system analyzes resumes, scores applicants based on job requirements, and provides intelligent hiring recommendations.
 
